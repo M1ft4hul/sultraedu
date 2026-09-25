@@ -10,6 +10,6 @@ class Cdashboard extends BaseController
             return redirect()->to('login');
         }
 
-        return view('admin/componen_be/layout');
+        return view('admin/dashboard');
     }
 }
