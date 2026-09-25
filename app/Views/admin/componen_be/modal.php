@@ -202,3 +202,25 @@
         </div>
     </div>
 </div>
+<div id="modalGantiAkun" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
+        <div class="mx-auto w-14 h-14 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+            <i class="fa-solid fa-user-lock text-2xl"></i>
+        </div>
+        <div>
+            <h3 class="font-bold text-slate-800 text-base">Akses Dibatasi</h3>
+            <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                Anda belum login sebagai <strong id="gantiAkunRole" class="text-slate-800">-</strong>
+                untuk mengakses fitur yang tersedia. Silakan login menggunakan akun yang telah dibuat oleh Admin Dinas.
+            </p>
+        </div>
+        <div class="flex justify-center space-x-2 pt-2">
+            <button type="button" onclick="closeModal('modalGantiAkun')"
+                class="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-600">Batal</button>
+            <a href="<?= base_url('logout') ?>"
+                class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold">
+                <i class="fa-solid fa-right-to-bracket mr-1"></i> Login
+            </a>
+        </div>
+    </div>
+</div>

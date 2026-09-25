@@ -1,5 +1,6 @@
 <script>
-    let currentRole = 'sekolah';
+    // let currentRole = 'sekolah';
+    let currentRole = <?= json_encode(session()->get('role') === 'admin_pusat' ? 'admin' : 'sekolah') ?>;
 
     let praktekBaikData = [{
             id: 1,
@@ -123,31 +124,55 @@
         if (tabId === 'monev') initMonevCharts();
     }
 
-    function switchRole(role) {
-        currentRole = role;
-        const badge = document.getElementById('roleBadge');
-        const adminSuaraBox = document.getElementById('admin-suara-box');
+    // function switchRole(role) {
+    //     currentRole = role;
+    //     const badge = document.getElementById('roleBadge');
+    //     const adminSuaraBox = document.getElementById('admin-suara-box');
 
-        if (role === 'sekolah') {
-            badge.innerText = "Sekolah";
-            badge.className = "bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-semibold border border-emerald-500/30";
-            if (adminSuaraBox) adminSuaraBox.classList.add('hidden');
-        } else if (role === 'admin') {
-            badge.innerText = "Admin Dinas";
-            badge.className = "bg-brand-500/20 text-brand-400 text-[10px] px-2 py-0.5 rounded-full font-semibold border border-brand-500/30";
-            if (adminSuaraBox) adminSuaraBox.classList.remove('hidden');
-        } else if (role === 'juri') {
-            badge.innerText = "Tim Juri";
-            badge.className = "bg-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded-full font-semibold border border-amber-500/30";
-            if (adminSuaraBox) adminSuaraBox.classList.add('hidden');
-        } else {
-            badge.innerText = "Publik";
-            badge.className = "bg-purple-500/20 text-purple-400 text-[10px] px-2 py-0.5 rounded-full font-semibold border border-purple-500/30";
-            if (adminSuaraBox) adminSuaraBox.classList.add('hidden');
-        }
-        renderAllViews();
-        showToast("Simulasi Akses Diubah", `Akses pengguna kini disimulasikan sebagai: ${role.toUpperCase()}`, 'info');
+    //     if (role === 'sekolah') {
+    //         badge.innerText = "Sekolah";
+    //         badge.className = "bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-semibold border border-emerald-500/30";
+    //         if (adminSuaraBox) adminSuaraBox.classList.add('hidden');
+    //     } else if (role === 'admin') {
+    //         badge.innerText = "Admin Dinas";
+    //         badge.className = "bg-brand-500/20 text-brand-400 text-[10px] px-2 py-0.5 rounded-full font-semibold border border-brand-500/30";
+    //         if (adminSuaraBox) adminSuaraBox.classList.remove('hidden');
+    //     } else if (role === 'juri') {
+    //         badge.innerText = "Tim Juri";
+    //         badge.className = "bg-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded-full font-semibold border border-amber-500/30";
+    //         if (adminSuaraBox) adminSuaraBox.classList.add('hidden');
+    //     } else {
+    //         badge.innerText = "Guru";
+    //         badge.className = "bg-purple-500/20 text-purple-400 text-[10px] px-2 py-0.5 rounded-full font-semibold border border-purple-500/30";
+    //         if (adminSuaraBox) adminSuaraBox.classList.add('hidden');
+    //     }
+    //     renderAllViews();
+    //     showToast("Simulasi Akses Diubah", `Akses pengguna kini disimulasikan sebagai: ${role.toUpperCase()}`, 'info');
+    // }
+    function gantiAkun(select) {
+        const namaRole = select.options[select.selectedIndex].text;
+        select.value = select.dataset.current;
+        document.getElementById('gantiAkunRole').innerText = namaRole;
+        openModal('modalGantiAkun');
     }
+
+    function aturTampilanRole() {
+        const adminSuaraBox = document.getElementById('admin-suara-box');
+        if (adminSuaraBox) {
+            adminSuaraBox.classList.toggle('hidden', currentRole !== 'admin');
+        }
+    }
+
+    function toggleUserMenu() {
+        document.getElementById('userMenuDropdown').classList.toggle('hidden');
+    }
+
+    document.addEventListener('click', function(e) {
+        const menu = document.getElementById('userMenu');
+        if (menu && !menu.contains(e.target)) {
+            document.getElementById('userMenuDropdown').classList.add('hidden');
+        }
+    });
 
     function showToast(title, message, type = 'success') {
         const toast = document.getElementById('toastNotification');
@@ -545,7 +570,11 @@
         });
     }
 
+    // window.onload = function() {
+    //     renderAllViews();
+    // };
     window.onload = function() {
+        aturTampilanRole();
         renderAllViews();
     };
 </script>
