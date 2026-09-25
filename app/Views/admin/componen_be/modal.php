@@ -224,3 +224,24 @@
         </div>
     </div>
 </div>
+<div id="modalLogout" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
+        <div class="mx-auto w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+            <i class="fa-solid fa-right-from-bracket text-2xl"></i>
+        </div>
+        <div>
+            <h3 class="font-bold text-slate-800 text-base">Keluar dari EDUVATION?</h3>
+            <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                Sesi Anda akan diakhiri. Anda perlu login kembali untuk mengakses dashboard.
+            </p>
+        </div>
+        <div class="flex justify-center space-x-2 pt-2">
+            <button type="button" onclick="closeModal('modalLogout')"
+                class="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+            <a href="<?= base_url('logout') ?>"
+                class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold">
+                <i class="fa-solid fa-right-from-bracket mr-1"></i> Ya, Keluar
+            </a>
+        </div>
+    </div>
+</div>

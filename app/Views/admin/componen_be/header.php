@@ -81,11 +81,11 @@ $warna = $warnaRole[$role] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/3
                     </a>
 
                     <!-- Keluar -->
-                    <a href="<?= base_url('logout') ?>" onclick="return confirm('Yakin ingin keluar?')"
-                        class="flex items-center justify-between px-4 py-2.5 text-sm rounded-xl hover:bg-slate-800 hover:text-red-400 transition">
+                    <button type="button" onclick="toggleUserMenu(); openModal('modalLogout')"
+                        class="w-full flex items-center justify-between px-4 py-2.5 text-sm rounded-xl hover:bg-slate-800 hover:text-red-400 transition">
                         Keluar
                         <i class="fa-solid fa-right-from-bracket text-xs"></i>
-                    </a>
+                    </button>
                 </div>
             </div>
         </div>
