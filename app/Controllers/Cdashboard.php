@@ -10,8 +10,6 @@ class Cdashboard extends BaseController
             return redirect()->to('login');
         }
 
-        return 'Login berhasil. Halo, ' . esc(session()->get('nama'))
-            . ' (role: ' . esc(session()->get('role')) . '). '
-            . '<a href="' . base_url('logout') . '">Keluar</a>';
+        return view('admin/componen_be/layout');
     }
 }
