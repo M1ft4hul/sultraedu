@@ -28,22 +28,20 @@ class Cpengguna extends BaseController
             ->first();
     }
 
-    // =====================================================
-    // DAFTAR AKUN ADMIN SEKOLAH
-    // =====================================================
-    public function index()
+    // Ambil nilai filter dari URL
+    private function ambilFilter(): array
     {
-        if (! $this->bolehAkses()) {
-            return redirect()->to('dashboard');
-        }
-
-        $filter = [
+        return [
             'q'       => trim((string) $this->request->getGet('q')),
             'sekolah' => (string) $this->request->getGet('sekolah'),
             'status'  => (string) $this->request->getGet('status'),
         ];
+    }
 
-        // Kolom dipilih satu per satu supaya hash password tidak ikut terkirim ke halaman
+    // Query daftar akun admin sekolah (dipakai di tabel dan export)
+    private function queryPengguna(array $filter): array
+    {
+        // Kolom dipilih satu per satu supaya hash password tidak ikut terambil
         $builder = $this->admin
             ->select('admin.id_admin, admin.nama_admin, admin.username, admin.id_sekolah, admin.email, admin.status, admin.created_at, s.nama_sekolah, s.npsn, s.kabupaten_kota, s.status AS status_sekolah')
             ->join('sekolah s', 's.id_sekolah = admin.id_sekolah', 'left')
@@ -63,29 +61,115 @@ class Cpengguna extends BaseController
             $builder->where('admin.status', $filter['status']);
         }
 
-        $data['pengguna'] = $builder->orderBy('s.nama_sekolah', 'ASC')->findAll();
+        return $builder->orderBy('s.nama_sekolah', 'ASC')->findAll();
+    }
+
+    // Sekolah aktif yang belum punya akun admin sekolah
+    private function sekolahTanpaAdmin(): array
+    {
+        return \Config\Database::connect()->table('sekolah')
+            ->select('id_sekolah, npsn, nama_sekolah, kabupaten_kota, email')
+            ->where('status', 'aktif')
+            ->whereNotIn('id_sekolah', function ($sub) {
+                return $sub->select('id_sekolah')->from('admin')
+                    ->where('role', 'admin_sekolah')
+                    ->where('id_sekolah IS NOT NULL');
+            })
+            ->orderBy('kabupaten_kota', 'ASC')
+            ->orderBy('nama_sekolah', 'ASC')
+            ->get()->getResultArray();
+    }
+
+    // Password acak tanpa huruf yang mudah tertukar (l, 1, I, O, 0)
+    private function passwordAcak(int $panjang = 10): string
+    {
+        $huruf = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        $hasil = '';
+        for ($i = 0; $i < $panjang; $i++) {
+            $hasil .= $huruf[random_int(0, strlen($huruf) - 1)];
+        }
+
+        return $hasil;
+    }
+
+    // Cek username belum dipakai di tabel admin maupun guru
+    private function usernameTersedia(string $username): bool
+    {
+        $db = \Config\Database::connect();
+
+        return $db->table('admin')->where('username', $username)->countAllResults() === 0
+            && $db->table('guru')->where('username', $username)->countAllResults() === 0;
+    }
+
+    // Buat username unik: pakai dasar (NPSN), tambah -2, -3, dst kalau sudah dipakai
+    private function usernameUnik(string $dasar): string
+    {
+        $username = $dasar;
+        $urutan   = 2;
+        while (! $this->usernameTersedia($username)) {
+            $username = $dasar . '-' . $urutan++;
+        }
+
+        return $username;
+    }
+
+    // Kirim file CSV (bisa dibuka di Excel)
+    private function unduhCsv(string $namaFile, array $header, array $baris)
+    {
+        $file = fopen('php://temp', 'r+');
+        fwrite($file, "\xEF\xBB\xBF"); // BOM supaya huruf terbaca benar di Excel
+        fputcsv($file, $header, ';');
+        foreach ($baris as $b) {
+            fputcsv($file, $b, ';');
+        }
+        rewind($file);
+        $isi = stream_get_contents($file);
+        fclose($file);
+
+        return $this->response
+            ->setHeader('Content-Type', 'text/csv; charset=UTF-8')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $namaFile . '"')
+            ->setBody($isi);
+    }
+
+    // Balasan gagal untuk proses massal (dipanggil lewat JavaScript)
+    private function gagalMassal(string $pesan)
+    {
+        if ($this->request->isAJAX()) {
+            return $this->response->setStatusCode(422)->setJSON(['pesan' => $pesan]);
+        }
+
+        return redirect()->to('pengguna')->with('gagal', $pesan);
+    }
+
+    // =====================================================
+    // DAFTAR AKUN ADMIN SEKOLAH
+    // =====================================================
+    public function index()
+    {
+        if (! $this->bolehAkses()) {
+            return redirect()->to('dashboard');
+        }
+
+        $filter = $this->ambilFilter();
+
+        $data['pengguna'] = $this->queryPengguna($filter);
         $data['filter']   = $filter;
 
         // Daftar sekolah untuk dropdown form & filter
         $data['daftarSekolah'] = (new SekolahModel())
-            ->select('id_sekolah, npsn, nama_sekolah, kabupaten_kota, status')
+            ->select('id_sekolah, npsn, nama_sekolah, kabupaten_kota, email, status')
             ->orderBy('nama_sekolah', 'ASC')
             ->findAll();
 
+        // Sekolah aktif yang belum punya admin (untuk fitur Buat Akun Massal)
+        $data['sekolahTanpaAdmin'] = $this->sekolahTanpaAdmin();
+
         // Ringkasan
-        $db = \Config\Database::connect();
         $data['ringkas'] = [
-            'total' => $this->admin->where('role', 'admin_sekolah')->countAllResults(),
-            'aktif' => $this->admin->where('role', 'admin_sekolah')->where('status', 'aktif')->countAllResults(),
-            // Sekolah aktif yang belum punya akun admin sekolah sama sekali
-            'tanpaAdmin' => $db->table('sekolah')
-                ->where('status', 'aktif')
-                ->whereNotIn('id_sekolah', function ($sub) {
-                    return $sub->select('id_sekolah')->from('admin')
-                        ->where('role', 'admin_sekolah')
-                        ->where('id_sekolah IS NOT NULL');
-                })
-                ->countAllResults(),
+            'total'      => $this->admin->where('role', 'admin_sekolah')->countAllResults(),
+            'aktif'      => $this->admin->where('role', 'admin_sekolah')->where('status', 'aktif')->countAllResults(),
+            'tanpaAdmin' => count($data['sekolahTanpaAdmin']),
         ];
 
         return view('admin/dinas/pengguna', $data);
@@ -184,7 +268,186 @@ class Cpengguna extends BaseController
             $pesanSukses = 'Akun admin sekolah untuk ' . esc($input['nama_admin']) . ' berhasil dibuat.';
         }
 
-        return redirect()->to('pengguna')->with('sukses', $pesanSukses);
+        $redirect = redirect()->to('pengguna')->with('sukses', $pesanSukses);
+
+        // Kalau password dibuat/direset, tampilkan SEKALI di halaman berikutnya
+        if (! empty($input['password'])) {
+            $sekolah = (new SekolahModel())->find($input['id_sekolah']);
+
+            $redirect->with('akunBaru', [
+                'jenis'    => $edit ? 'reset' : 'baru',
+                'nama'     => $input['nama_admin'],
+                'sekolah'  => $sekolah['nama_sekolah'] ?? '-',
+                'username' => $input['username'],
+                'password' => $input['password'],
+                'url'      => site_url('login'),
+            ]);
+        }
+
+        return $redirect;
+    }
+
+    // =====================================================
+    // UNDUH REKAP AKUN (CSV, bisa dibuka di Excel)
+    // =====================================================
+    public function export()
+    {
+        if (! $this->bolehAkses()) {
+            return redirect()->to('dashboard');
+        }
+
+        $data  = $this->queryPengguna($this->ambilFilter());
+        $baris = [];
+
+        foreach ($data as $i => $p) {
+            $baris[] = [
+                $i + 1,
+                $p['nama_admin'],
+                $p['username'],
+                $p['nama_sekolah'] ?? '-',
+                // Tanda kutip tunggal agar NPSN tidak diubah Excel menjadi angka
+                $p['npsn'] ? "'" . $p['npsn'] : '-',
+                $p['kabupaten_kota'] ?? '-',
+                $p['email'] ?: '-',
+                ucfirst($p['status']),
+                date('d/m/Y', strtotime($p['created_at'])),
+            ];
+        }
+
+        return $this->unduhCsv(
+            'rekap-akun-admin-sekolah-' . date('Ymd-His') . '.csv',
+            ['No', 'Nama Lengkap', 'Username', 'Sekolah', 'NPSN', 'Kabupaten/Kota', 'Email', 'Status Akun', 'Tanggal Dibuat'],
+            $baris
+        );
+    }
+
+    // =====================================================
+    // BUAT AKUN MASSAL + UNDUH PASSWORD
+    // =====================================================
+    public function buatMassal()
+    {
+        if (! $this->bolehAkses()) {
+            return $this->gagalMassal('Anda tidak memiliki akses.');
+        }
+
+        $dipilih = array_map('intval', (array) $this->request->getPost('sekolah'));
+        if (empty($dipilih)) {
+            return $this->gagalMassal('Pilih minimal satu sekolah.');
+        }
+
+        // Hanya sekolah yang memang belum punya admin (mencegah akun dobel)
+        $sekolah = array_filter(
+            $this->sekolahTanpaAdmin(),
+            fn($s) => in_array((int) $s['id_sekolah'], $dipilih, true)
+        );
+        if (empty($sekolah)) {
+            return $this->gagalMassal('Sekolah yang dipilih sudah memiliki akun admin.');
+        }
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        $baris = [];
+        foreach ($sekolah as $s) {
+            $username = $this->usernameUnik(strtolower($s['npsn']));
+            $password = $this->passwordAcak();
+            $nama     = mb_substr('Admin ' . $s['nama_sekolah'], 0, 100);
+
+            // Password di-hash otomatis oleh AdminModel sebelum disimpan
+            $this->admin->insert([
+                'nama_admin' => $nama,
+                'username'   => $username,
+                'password'   => $password,
+                'role'       => 'admin_sekolah',
+                'id_sekolah' => $s['id_sekolah'],
+                'email'      => $s['email'] ?: null, // email resmi sekolah (kosong kalau belum ada)
+                'status'     => 'aktif',
+            ]);
+
+            $baris[] = [
+                count($baris) + 1,
+                $s['nama_sekolah'],
+                "'" . $s['npsn'],
+                $s['kabupaten_kota'],
+                $s['email'] ?: '-',
+                $username,
+                $password,
+            ];
+        }
+
+        $db->transComplete();
+
+        if (! $db->transStatus()) {
+            return $this->gagalMassal('Terjadi kesalahan. Tidak ada akun yang dibuat.');
+        }
+
+        session()->setFlashdata('sukses', count($baris) . ' akun Admin Sekolah berhasil dibuat. File berisi username dan password sudah diunduh.');
+
+        return $this->unduhCsv(
+            'akun-baru-admin-sekolah-' . date('Ymd-His') . '.csv',
+            ['No', 'Sekolah', 'NPSN', 'Kabupaten/Kota', 'Email', 'Username', 'Password'],
+            $baris
+        );
+    }
+
+    // =====================================================
+    // RESET PASSWORD MASSAL + UNDUH PASSWORD BARU
+    // =====================================================
+    public function resetMassal()
+    {
+        if (! $this->bolehAkses()) {
+            return $this->gagalMassal('Anda tidak memiliki akses.');
+        }
+
+        $dipilih = array_map('intval', (array) $this->request->getPost('akun'));
+        if (empty($dipilih)) {
+            return $this->gagalMassal('Pilih minimal satu akun.');
+        }
+
+        // Hanya akun admin sekolah yang bisa direset lewat sini
+        $akun = $this->admin
+            ->select('admin.id_admin, admin.nama_admin, admin.username, s.nama_sekolah, s.npsn')
+            ->join('sekolah s', 's.id_sekolah = admin.id_sekolah', 'left')
+            ->where('admin.role', 'admin_sekolah')
+            ->whereIn('admin.id_admin', $dipilih)
+            ->orderBy('s.nama_sekolah', 'ASC')
+            ->findAll();
+
+        if (empty($akun)) {
+            return $this->gagalMassal('Akun yang dipilih tidak ditemukan.');
+        }
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        $baris = [];
+        foreach ($akun as $a) {
+            $password = $this->passwordAcak();
+            $this->admin->update($a['id_admin'], ['password' => $password]);
+
+            $baris[] = [
+                count($baris) + 1,
+                $a['nama_admin'],
+                $a['nama_sekolah'] ?? '-',
+                $a['npsn'] ? "'" . $a['npsn'] : '-',
+                $a['username'],
+                $password,
+            ];
+        }
+
+        $db->transComplete();
+
+        if (! $db->transStatus()) {
+            return $this->gagalMassal('Terjadi kesalahan. Tidak ada password yang direset.');
+        }
+
+        session()->setFlashdata('sukses', 'Password ' . count($baris) . ' akun berhasil direset. File berisi password baru sudah diunduh.');
+
+        return $this->unduhCsv(
+            'reset-password-admin-sekolah-' . date('Ymd-His') . '.csv',
+            ['No', 'Nama', 'Sekolah', 'NPSN', 'Username', 'Password Baru'],
+            $baris
+        );
     }
 
     // =====================================================

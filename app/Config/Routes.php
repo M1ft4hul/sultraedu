@@ -14,6 +14,10 @@ $routes->get('logout', 'Auth::logout');
 // Dashboard admin (admin pusat dan admin sekolah)
 $routes->get('dashboard', 'Cdashboard::index');
 $routes->get('praktik-baik', 'CpraktikBaik::index');
+$routes->post('praktik-baik/verifikasi/(:num)', 'CpraktikBaik::verifikasi/$1');
+// Bank Inovasi
+$routes->get('bank-inovasi', 'CbankInovasi::index');
+$routes->post('bank-inovasi/verifikasi/(:num)', 'CbankInovasi::verifikasi/$1');
 
 // Data Sekolah (Admin Dinas/Pusat)
 $routes->get('sekolah', 'Csekolah::index');
@@ -27,3 +31,5 @@ $routes->post('pengguna/simpan', 'Cpengguna::simpan');
 $routes->post('pengguna/status/(:num)', 'Cpengguna::status/$1');
 $routes->post('pengguna/hapus/(:num)', 'Cpengguna::hapus/$1');
 $routes->get('pengguna/export', 'Cpengguna::export');
+$routes->post('pengguna/buat-massal', 'Cpengguna::buatMassal');
+$routes->post('pengguna/reset-massal', 'Cpengguna::resetMassal');

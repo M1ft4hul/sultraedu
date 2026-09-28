@@ -6,7 +6,7 @@ $uri  = uri_string();
 $menus = [
     ['label' => 'Beranda',                      'icon' => 'fa-house',                   'url' => 'dashboard',           'roles' => 'semua'],
     ['label' => 'Praktik Baik',                 'icon' => 'fa-book-open',         'url' => 'praktik-baik',         'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
-    ['label' => 'Bank Inovasi',              'icon' => 'fa-box-archive',        'tab' => 'bank-inovasi',       'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
+    ['label' => 'Bank Inovasi',              'icon' => 'fa-box-archive',        'url' => 'bank-inovasi',       'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
     ['label' => 'Kompetisi Inovasi',     'icon' => 'fa-trophy',                 'tab' => 'kompetisi',              'roles' => 'semua'],
     ['label' => 'Apresiasi',                    'icon' => 'fa-award',                   'tab' => 'apresiasi',               'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
     ['label' => 'Monev',                        'icon' => 'fa-chart-line',             'tab' => 'monev',                   'roles' => ['admin_pusat']],

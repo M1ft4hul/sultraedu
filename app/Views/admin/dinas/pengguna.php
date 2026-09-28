@@ -4,6 +4,7 @@
 /** @var array $filter */
 /** @var array $daftarSekolah */
 /** @var array $ringkas */
+/** @var array $sekolahTanpaAdmin */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
@@ -17,10 +18,22 @@
             <h2 class="text-xl font-bold text-slate-800">Akun Admin Sekolah</h2>
             <p class="text-xs text-slate-500">Kelola akun Admin Sekolah yang bertugas memverifikasi praktik baik dan mengelola akun guru di sekolahnya.</p>
         </div>
-        <button type="button" onclick="bukaFormPengguna()"
-            class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow transition flex items-center">
-            <i class="fa-solid fa-user-plus mr-2"></i>Tambah Admin Sekolah
-        </button>
+        <div class="flex flex-wrap gap-2">
+            <?php if (! empty($sekolahTanpaAdmin)) : ?>
+                <button type="button" onclick="openModal('modalMassal')"
+                    class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow transition flex items-center">
+                    <i class="fa-solid fa-users-rectangle mr-2"></i>Buat Akun Massal
+                </button>
+            <?php endif; ?>
+            <a href="<?= site_url('pengguna/export') . '?' . http_build_query($filter) ?>"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow transition flex items-center">
+                <i class="fa-solid fa-file-excel mr-2"></i>Unduh Excel
+            </a>
+            <button type="button" onclick="bukaFormPengguna()"
+                class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow transition flex items-center">
+                <i class="fa-solid fa-user-plus mr-2"></i>Tambah Admin Sekolah
+            </button>
+        </div>
     </div>
 
     <!-- Ringkasan -->
@@ -53,6 +66,58 @@
         </div>
     <?php endif; ?>
 
+
+    <!-- Info akun baru / password direset (tampil SEKALI) -->
+    <?php $akunBaru = session()->getFlashdata('akunBaru'); ?>
+    <?php if ($akunBaru) : ?>
+        <div class="bg-white border-2 border-emerald-300 rounded-2xl p-5 shadow-sm">
+            <div class="flex flex-wrap justify-between items-start gap-3 mb-3">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-sm flex items-center">
+                        <i class="fa-solid fa-key text-emerald-600 mr-2"></i>
+                        <?= $akunBaru['jenis'] === 'reset' ? 'Password Berhasil Direset' : 'Akun Berhasil Dibuat' ?>
+                    </h3>
+                    <p class="text-[11px] text-amber-700 mt-1">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                        Password hanya ditampilkan sekali. Salin dan kirimkan ke pihak sekolah sekarang.
+                    </p>
+                </div>
+                <button type="button" onclick="salinAkun(this)"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center">
+                    <i class="fa-regular fa-copy mr-2"></i>Salin Info Akun
+                </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <div class="text-[10px] text-slate-400 uppercase tracking-wider">Nama</div>
+                    <div class="font-semibold text-slate-800"><?= esc($akunBaru['nama']) ?></div>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <div class="text-[10px] text-slate-400 uppercase tracking-wider">Sekolah</div>
+                    <div class="font-semibold text-slate-800"><?= esc($akunBaru['sekolah']) ?></div>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <div class="text-[10px] text-slate-400 uppercase tracking-wider">Username</div>
+                    <div class="font-mono font-semibold text-slate-800"><?= esc($akunBaru['username']) ?></div>
+                </div>
+                <div class="bg-emerald-50 rounded-lg p-3 border border-emerald-200">
+                    <div class="text-[10px] text-emerald-600 uppercase tracking-wider">Password</div>
+                    <div class="font-mono font-bold text-emerald-800"><?= esc($akunBaru['password']) ?></div>
+                </div>
+            </div>
+            <!-- Teks yang disalin ke clipboard -->
+            <textarea id="teksAkun" class="hidden"><?= esc(
+                                                        "Akun EDUVATION - Admin Sekolah\n" .
+                                                            "Nama     : {$akunBaru['nama']}\n" .
+                                                            "Sekolah  : {$akunBaru['sekolah']}\n" .
+                                                            "Username : {$akunBaru['username']}\n" .
+                                                            "Password : {$akunBaru['password']}\n" .
+                                                            "Login di : {$akunBaru['url']}\n\n" .
+                                                            "Mohon jaga kerahasiaan password ini."
+                                                    ) ?></textarea>
+        </div>
+    <?php endif; ?>
+
     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
 
         <!-- Pencarian & filter -->
@@ -82,6 +147,18 @@
             </div>
         </form>
 
+        <!-- Form reset massal (checkbox di tabel terhubung lewat atribut form="") -->
+        <form id="formResetMassal" action="<?= site_url('pengguna/reset-massal') ?>" method="post">
+            <?= csrf_field() ?>
+        </form>
+        <div id="barResetMassal" class="hidden items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs">
+            <span class="text-amber-900"><b id="jumlahTerpilih">0</b> akun dipilih</span>
+            <button type="button" onclick="bukaResetMassal()"
+                class="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-3 py-1.5 rounded-lg flex items-center">
+                <i class="fa-solid fa-key mr-1.5"></i>Reset Password & Unduh
+            </button>
+        </div>
+
         <!-- Tabel -->
         <?php if (empty($pengguna)) : ?>
             <div class="flex flex-col items-center justify-center text-center py-10 px-4">
@@ -104,7 +181,10 @@
                 <table class="w-full text-left text-xs text-slate-600">
                     <thead class="bg-slate-100 uppercase text-slate-700 font-bold tracking-wider">
                         <tr>
-                            <th class="p-3.5 rounded-l-lg">Nama</th>
+                            <th class="p-3.5 rounded-l-lg w-8">
+                                <input type="checkbox" title="Pilih semua" onchange="pilihSemua(this, 'cek-akun'); hitungTerpilih()" class="w-4 h-4 accent-brand-600">
+                            </th>
+                            <th class="p-3.5">Nama</th>
                             <th class="p-3.5">Sekolah</th>
                             <th class="p-3.5">Email</th>
                             <th class="p-3.5">Status</th>
@@ -115,6 +195,10 @@
                     <tbody class="divide-y divide-slate-200">
                         <?php foreach ($pengguna as $p) : ?>
                             <tr class="hover:bg-slate-50 transition <?= $p['status'] === 'nonaktif' ? 'opacity-60' : '' ?>">
+                                <td class="p-3.5">
+                                    <input type="checkbox" name="akun[]" value="<?= $p['id_admin'] ?>" form="formResetMassal"
+                                        onchange="hitungTerpilih()" class="cek-akun w-4 h-4 accent-brand-600">
+                                </td>
                                 <td class="p-3.5">
                                     <div class="font-bold text-slate-800"><?= esc($p['nama_admin']) ?></div>
                                     <div class="text-[11px] text-slate-400 font-mono">@<?= esc($p['username']) ?></div>
@@ -209,10 +293,10 @@
 
             <div>
                 <label class="font-semibold block mb-1 text-slate-700">Sekolah <span class="text-red-500">*</span></label>
-                <select name="id_sekolah" id="p_id_sekolah" required class="w-full border border-slate-300 rounded-lg p-2.5">
+                <select name="id_sekolah" id="p_id_sekolah" required onchange="isiEmailSekolah(this)" class="w-full border border-slate-300 rounded-lg p-2.5">
                     <option value="">Pilih sekolah</option>
                     <?php foreach ($daftarSekolah as $s) : ?>
-                        <option value="<?= $s['id_sekolah'] ?>">
+                        <option value="<?= $s['id_sekolah'] ?>" data-email="<?= esc($s['email'] ?? '', 'attr') ?>">
                             <?= esc($s['nama_sekolah']) ?> — <?= esc($s['kabupaten_kota']) ?><?= $s['status'] === 'nonaktif' ? ' (nonaktif)' : '' ?>
                         </option>
                     <?php endforeach; ?>
@@ -232,9 +316,14 @@
                         class="w-full border border-slate-300 rounded-lg p-2.5 font-mono lowercase">
                 </div>
                 <div>
-                    <label class="font-semibold block mb-1 text-slate-700">
-                        Password <span id="p_password_wajib" class="text-red-500">*</span>
-                    </label>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="font-semibold text-slate-700">
+                            Password <span id="p_password_wajib" class="text-red-500">*</span>
+                        </label>
+                        <button type="button" onclick="buatPassword()" class="text-[10px] text-brand-600 font-semibold hover:underline">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-0.5"></i>Buat Otomatis
+                        </button>
+                    </div>
                     <div class="relative">
                         <input type="password" name="password" id="p_password" autocomplete="new-password"
                             class="w-full border border-slate-300 rounded-lg p-2.5 pr-9">
@@ -250,6 +339,7 @@
                 <div>
                     <label class="font-semibold block mb-1 text-slate-700">Email</label>
                     <input type="email" name="email" id="p_email" class="w-full border border-slate-300 rounded-lg p-2.5">
+                    <p class="text-[10px] text-slate-400 mt-1">Otomatis terisi dari email sekolah, bisa diubah.</p>
                 </div>
                 <div>
                     <label class="font-semibold block mb-1 text-slate-700">Status <span class="text-red-500">*</span></label>
@@ -267,6 +357,88 @@
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- =====================================================
+     MODAL BUAT AKUN MASSAL
+     ===================================================== -->
+<div id="modalMassal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <form id="formMassal" action="<?= site_url('pengguna/buat-massal') ?>" method="post"
+        class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl max-h-[90vh] flex flex-col text-xs">
+        <?= csrf_field() ?>
+        <div class="flex justify-between items-center border-b pb-3 mb-4">
+            <h3 class="font-bold text-slate-800 text-base">
+                <i class="fa-solid fa-users-rectangle text-amber-500 mr-2"></i>Buat Akun Massal
+            </h3>
+            <button type="button" onclick="closeModal('modalMassal')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="bg-slate-50 border rounded-xl p-3.5 mb-4 text-slate-600 leading-relaxed space-y-1">
+            <p><i class="fa-solid fa-circle-info text-brand-600 mr-1"></i>Setiap sekolah yang dipilih akan dibuatkan satu akun Admin Sekolah dengan:</p>
+            <ul class="list-disc list-inside pl-1">
+                <li><b>Username</b>: NPSN sekolah</li>
+                <li><b>Password</b>: acak 10 karakter</li>
+                <li><b>Nama</b>: "Admin [nama sekolah]" (bisa diubah nanti lewat Edit)</li>
+                <li><b>Email</b>: email sekolah dari Data Sekolah (kosong kalau belum diisi)</li>
+            </ul>
+            <p class="text-amber-700 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>File berisi password langsung terunduh dan hanya dibuat sekali. Simpan baik-baik.</p>
+        </div>
+
+        <label class="flex items-center gap-2 font-semibold text-slate-700 pb-2 border-b mb-2">
+            <input type="checkbox" onchange="pilihSemua(this, 'cek-massal'); hitungMassal()" class="w-4 h-4 accent-brand-600">
+            Pilih semua (<?= count($sekolahTanpaAdmin) ?> sekolah belum punya admin)
+        </label>
+
+        <div class="overflow-y-auto flex-1 min-h-0 space-y-1 pr-1" style="max-height: 45vh">
+            <?php foreach ($sekolahTanpaAdmin as $s) : ?>
+                <label class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+                    <input type="checkbox" name="sekolah[]" value="<?= $s['id_sekolah'] ?>" onchange="hitungMassal()" class="cek-massal w-4 h-4 accent-brand-600">
+                    <div class="flex-1">
+                        <div class="font-semibold text-slate-800"><?= esc($s['nama_sekolah']) ?></div>
+                        <div class="text-[11px] text-slate-400">NPSN <?= esc($s['npsn']) ?> • <?= esc($s['kabupaten_kota']) ?></div>
+                    </div>
+                </label>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="flex justify-between items-center border-t pt-3 mt-3">
+            <span class="text-slate-500"><b id="jumlahMassal">0</b> sekolah dipilih</span>
+            <div class="flex space-x-2">
+                <button type="button" onclick="closeModal('modalMassal')" class="px-4 py-2 border rounded-lg font-semibold text-slate-600">Batal</button>
+                <button type="button" id="tombolMassal" disabled
+                    onclick="kirimDanUnduh(document.getElementById('formMassal'), this)"
+                    class="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-semibold">
+                    <i class="fa-solid fa-download mr-1"></i> Buat & Unduh
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- =====================================================
+     MODAL KONFIRMASI RESET PASSWORD MASSAL
+     ===================================================== -->
+<div id="modalResetMassal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
+        <div class="mx-auto w-14 h-14 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+            <i class="fa-solid fa-key text-2xl"></i>
+        </div>
+        <div>
+            <h3 class="font-bold text-slate-800 text-base">Reset password <span id="jumlahReset">0</span> akun?</h3>
+            <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                Password lama tidak bisa dipakai lagi. File berisi password baru akan langsung terunduh.
+            </p>
+        </div>
+        <div class="flex justify-center space-x-2 pt-2">
+            <button type="button" onclick="closeModal('modalResetMassal')" class="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+            <button type="button" onclick="kirimDanUnduh(document.getElementById('formResetMassal'), this)"
+                class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold">
+                <i class="fa-solid fa-download mr-1"></i> Reset & Unduh
+            </button>
+        </div>
     </div>
 </div>
 
@@ -312,6 +484,109 @@
             'Minimal 8 karakter.';
 
         openModal('modalPengguna');
+    }
+
+
+    // Buat password acak 10 karakter (tanpa huruf yang mirip seperti l, 1, O, 0)
+    function buatPassword() {
+        const huruf = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        const acak = new Uint32Array(10);
+        crypto.getRandomValues(acak);
+        const hasil = Array.from(acak, n => huruf[n % huruf.length]).join('');
+
+        const pass = document.getElementById('p_password');
+        pass.value = hasil;
+        pass.type = 'text';
+        document.getElementById('p_password_ikon').className = 'fa-solid fa-eye-slash';
+    }
+
+    // Salin info akun ke clipboard
+    function salinAkun(tombol) {
+        const teks = document.getElementById('teksAkun').value;
+        navigator.clipboard.writeText(teks).then(() => {
+            tombol.innerHTML = '<i class="fa-solid fa-check mr-2"></i>Tersalin!';
+            setTimeout(() => {
+                tombol.innerHTML = '<i class="fa-regular fa-copy mr-2"></i>Salin Info Akun';
+            }, 2000);
+        });
+    }
+
+
+    // ---------- Pilih banyak ----------
+    function pilihSemua(sumber, kelas) {
+        document.querySelectorAll('.' + kelas).forEach(c => c.checked = sumber.checked);
+    }
+
+    function hitungTerpilih() {
+        const n = document.querySelectorAll('.cek-akun:checked').length;
+        document.getElementById('jumlahTerpilih').innerText = n;
+        const bar = document.getElementById('barResetMassal');
+        bar.classList.toggle('hidden', n === 0);
+        bar.classList.toggle('flex', n > 0);
+    }
+
+    function hitungMassal() {
+        const n = document.querySelectorAll('.cek-massal:checked').length;
+        document.getElementById('jumlahMassal').innerText = n;
+        document.getElementById('tombolMassal').disabled = n === 0;
+    }
+
+    function bukaResetMassal() {
+        document.getElementById('jumlahReset').innerText = document.querySelectorAll('.cek-akun:checked').length;
+        openModal('modalResetMassal');
+    }
+
+    // ---------- Kirim form lalu unduh file hasilnya ----------
+    // Halaman baru di-refresh SETELAH file benar-benar terunduh,
+    // supaya file berisi password tidak pernah hilang di tengah jalan.
+    async function kirimDanUnduh(form, tombol) {
+        const isiAwal = tombol.innerHTML;
+        tombol.disabled = true;
+        tombol.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Memproses...';
+
+        try {
+            const res = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                showToast('Gagal', data.pesan || 'Terjadi kesalahan. Coba lagi.', 'error');
+                tombol.disabled = false;
+                tombol.innerHTML = isiAwal;
+                return;
+            }
+
+            const blob = await res.blob();
+            const cocok = (res.headers.get('Content-Disposition') || '').match(/filename="(.+)"/);
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = cocok ? cocok[1] : 'akun-admin-sekolah.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            tombol.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Selesai';
+            setTimeout(() => location.reload(), 1200);
+        } catch (e) {
+            showToast('Koneksi terputus', 'Periksa daftar akun sebelum mencoba lagi.', 'error');
+            tombol.disabled = false;
+            tombol.innerHTML = isiAwal;
+        }
+    }
+
+
+    // Isi email otomatis dari email sekolah, hanya kalau kolom email masih kosong
+    function isiEmailSekolah(select) {
+        const email = select.options[select.selectedIndex]?.dataset.email || '';
+        const kolom = document.getElementById('p_email');
+        if (kolom.value.trim() === '' && email) {
+            kolom.value = email;
+        }
     }
 
     // Tampilkan / sembunyikan password
