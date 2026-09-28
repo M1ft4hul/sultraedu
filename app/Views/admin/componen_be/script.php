@@ -113,13 +113,37 @@
     ];
 
     function navTo(tabId) {
-        const tabs = ['beranda', 'praktek-baik', 'bank-inovasi', 'kompetisi', 'apresiasi', 'monev', 'suara'];
+        // Menu yang sudah punya halaman sendiri
+        const halamanTerpisah = {
+            'praktek-baik': '<?= site_url('praktik-baik') ?>',
+        };
+        if (halamanTerpisah[tabId]) {
+            window.location.href = halamanTerpisah[tabId];
+            return;
+        }
+
+        const target = document.getElementById(`sec-${tabId}`);
+
+        if (!target) {
+            // Sudah di dashboard tapi tab tidak ada: berhenti, jangan reload
+            if (document.getElementById('sec-beranda')) return;
+
+            // Di halaman lain: pindah ke dashboard lalu buka tab tersebut
+            window.location.href = '<?= site_url('dashboard') ?>#' + tabId;
+            return;
+        }
+
+        const tabs = ['beranda', 'bank-inovasi', 'kompetisi', 'apresiasi', 'monev', 'suara'];
         tabs.forEach(t => {
-            document.getElementById(`sec-${t}`).classList.add('hidden');
-            document.getElementById(`tab-${t}`).classList.remove('active-tab');
+            const sec = document.getElementById(`sec-${t}`);
+            const tab = document.getElementById(`tab-${t}`);
+            if (sec) sec.classList.add('hidden');
+            if (tab) tab.classList.remove('active-tab');
         });
-        document.getElementById(`sec-${tabId}`).classList.remove('hidden');
-        document.getElementById(`tab-${tabId}`).classList.add('active-tab');
+
+        target.classList.remove('hidden');
+        const tabAktif = document.getElementById(`tab-${tabId}`);
+        if (tabAktif) tabAktif.classList.add('active-tab');
 
         if (tabId === 'monev') initMonevCharts();
     }
@@ -167,6 +191,17 @@
         document.getElementById('userMenuDropdown').classList.toggle('hidden');
     }
 
+    function toggleKelolaMenu() {
+        document.getElementById('kelolaMenuDropdown').classList.toggle('hidden');
+    }
+
+    document.addEventListener('click', function(e) {
+        const menu = document.getElementById('kelolaMenu');
+        if (menu && !menu.contains(e.target)) {
+            document.getElementById('kelolaMenuDropdown').classList.add('hidden');
+        }
+    });
+
     document.addEventListener('click', function(e) {
         const menu = document.getElementById('userMenu');
         if (menu && !menu.contains(e.target)) {
@@ -212,11 +247,11 @@
         const homeList = document.getElementById('home-praktek-list');
         const grid = document.getElementById('praktek-grid');
 
-        homeList.innerHTML = '';
-        grid.innerHTML = '';
+        if (homeList) homeList.innerHTML = '';
+        if (grid) grid.innerHTML = '';
 
         praktekBaikData.forEach((item, index) => {
-            if (index < 2) {
+            if (homeList && index < 2) {
                 homeList.innerHTML += `
                         <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                             <div>
@@ -229,30 +264,33 @@
                     `;
             }
 
-            grid.innerHTML += `
-                    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
-                        <div class="space-y-2.5">
-                            <div class="flex justify-between items-start">
-                                <span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2.5 py-1 rounded-full">${item.kab}</span>
-                                <span class="text-[10px] text-slate-400"><i class="fa-regular fa-calendar mr-1"></i>${item.tanggal}</span>
+            if (grid) {   // ← BARU
+                grid.innerHTML += `
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                            <div class="space-y-2.5">
+                                <div class="flex justify-between items-start">
+                                    <span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2.5 py-1 rounded-full">${item.kab}</span>
+                                    <span class="text-[10px] text-slate-400"><i class="fa-regular fa-calendar mr-1"></i>${item.tanggal}</span>
+                                </div>
+                                <h4 class="font-bold text-slate-800 text-sm leading-snug">${item.nama}</h4>
+                                <p class="text-xs font-semibold text-brand-600"><i class="fa-solid fa-school mr-1.5"></i>${item.sekolah}</p>
+                                <div class="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border space-y-1">
+                                    <div><strong class="text-slate-700">Masalah:</strong> ${item.masalah}</div>
+                                    <div><strong class="text-slate-700">Solusi:</strong> ${item.solusi}</div>
+                                </div>
                             </div>
-                            <h4 class="font-bold text-slate-800 text-sm leading-snug">${item.nama}</h4>
-                            <p class="text-xs font-semibold text-brand-600"><i class="fa-solid fa-school mr-1.5"></i>${item.sekolah}</p>
-                            <div class="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border space-y-1">
-                                <div><strong class="text-slate-700">Masalah:</strong> ${item.masalah}</div>
-                                <div><strong class="text-slate-700">Solusi:</strong> ${item.solusi}</div>
+                            <div class="mt-4 pt-3 border-t flex justify-between items-center text-xs">
+                                <span class="text-emerald-600 font-bold"><i class="fa-solid fa-circle-check mr-1"></i>${item.hasil}</span>
                             </div>
                         </div>
-                        <div class="mt-4 pt-3 border-t flex justify-between items-center text-xs">
-                            <span class="text-emerald-600 font-bold"><i class="fa-solid fa-circle-check mr-1"></i>${item.hasil}</span>
-                        </div>
-                    </div>
-                `;
+                    `;
+            }   // ← BARU
         });
     }
 
     function renderBankInovasi() {
         const tbody = document.getElementById('bank-table-body');
+        if (!tbody) return;
         tbody.innerHTML = '';
 
         bankInovasiData.forEach(item => {
@@ -279,6 +317,7 @@
 
     function renderKompetisi() {
         const grid = document.getElementById('kompetisi-grid');
+        if (!grid) return;
         grid.innerHTML = '';
 
         kompetisiData.forEach(item => {
@@ -321,6 +360,7 @@
 
     function renderApresiasi() {
         const grid = document.getElementById('apresiasi-grid');
+        if (!grid) return;
         grid.innerHTML = '';
 
         apresiasiData.forEach(item => {
@@ -576,5 +616,6 @@
     window.onload = function() {
         aturTampilanRole();
         renderAllViews();
+        if (location.hash) navTo(location.hash.substring(1));
     };
 </script>

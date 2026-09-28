@@ -13,3 +13,6 @@ $routes->get('logout', 'Auth::logout');
 
 // Dashboard admin (nanti dikunci dengan filter di langkah 5)
 $routes->get('dashboard', 'Cdashboard::index');
+
+
+$routes->get('praktik-baik', 'CpraktikBaik::index');

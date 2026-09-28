@@ -39,8 +39,11 @@
             <nav class="nav-menu nav-auth">
                 <div class="hidden-xs-down">
                     <div class="deco"></div>
-                    <a class="btn-flat text-btn waves-effect" href="<?php echo base_url('login') ?>">login</a>
-                    <a class="btn white light button waves-effect" href="register.html">register</a>
+                    <?php if (session()->get('logged_in')) : ?>
+                        <a class="btn white light button waves-effect" href="<?= site_url('dashboard') ?>">Buka Dashboard</a>
+                    <?php else : ?>
+                        <a class="btn white light button waves-effect" href="<?= base_url('login') ?>">login</a>
+                    <?php endif; ?>
                 </div>
             </nav>
         </div>
