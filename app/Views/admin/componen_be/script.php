@@ -140,6 +140,7 @@
             if (sec) sec.classList.add('hidden');
             if (tab) tab.classList.remove('active-tab');
         });
+        document.querySelectorAll('.active-tab').forEach(el => el.classList.remove('active-tab'));
 
         target.classList.remove('hidden');
         const tabAktif = document.getElementById(`tab-${tabId}`);
@@ -264,7 +265,7 @@
                     `;
             }
 
-            if (grid) {   // ← BARU
+            if (grid) { // ← BARU
                 grid.innerHTML += `
                         <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
                             <div class="space-y-2.5">
@@ -284,7 +285,7 @@
                             </div>
                         </div>
                     `;
-            }   // ← BARU
+            } // ← BARU
         });
     }
 

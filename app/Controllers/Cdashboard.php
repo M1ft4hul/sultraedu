@@ -9,7 +9,34 @@ class Cdashboard extends BaseController
         if (! session()->get('logged_in')) {
             return redirect()->to('login');
         }
+
+        // Pilih dashboard sesuai role
+        switch (session()->get('role')) {
+            case 'admin_pusat':
+                return $this->dashboardDinas();
+            case 'admin_sekolah':
+                return $this->dashboardSekolah();
+            case 'tim_juri':
+                return $this->dashboardJuri();
+            case 'guru':
+                return $this->dashboardGuru();
+        }
+
+        // Role tidak dikenal: keluarkan user dan beri pesan di halaman login
+        session()->remove(['logged_in', 'user_id', 'user_type', 'nama', 'username', 'role', 'id_sekolah']);
+
+        return redirect()->to('login')
+            ->with('error', 'Hak akses akun Anda tidak dikenali. Silakan hubungi Admin Dinas.');
+    }
+
+    // =====================================================
+    // ADMIN DINAS
+    // =====================================================
+    private function dashboardDinas()
+    {
         $db = \Config\Database::connect();
+
+        // Statistik se-provinsi
         $data['stat'] = [
             'sekolah'   => $db->table('sekolah')->where('status', 'aktif')->countAllResults(),
             'praktik'   => $db->table('praktik_baik')->where('status_verifikasi_dinas', 'disetujui')->countAllResults(),
@@ -18,6 +45,7 @@ class Cdashboard extends BaseController
             'suara'     => $db->table('suara')->countAllResults(),
         ];
 
+        // Pengumuman (sementara kosong)
         $data['pengumuman'] = [];
 
         // Antrean praktik baik yang menunggu validasi Dinas
@@ -31,23 +59,30 @@ class Cdashboard extends BaseController
         $data['totalAntrean'] = $antrean->countAllResults(false);
         $data['antrean']      = $antrean->orderBy('pb.tanggal_upload', 'ASC')->limit(5)->get()->getResultArray();
 
-        $role = session()->get('role');
+        return view('admin/dinas/dashboard', $data);
+    }
 
-        $halaman = [
-            'admin_pusat'   => 'admin/dinas/dashboard',
-            'admin_sekolah' => 'admin/sekolah/dashboard',
-            'tim_juri'      => 'admin/juri/dashboard',
-            'guru'          => 'admin/guru/dashboard',
-        ];
+    // =====================================================
+    // ADMIN SEKOLAH (nanti dilengkapi)
+    // =====================================================
+    private function dashboardSekolah()
+    {
+        return view('admin/sekolah/dashboard');
+    }
 
-        // Role tidak dikenal: keluarkan user dan beri pesan di halaman login
-        if (! isset($halaman[$role])) {
-            session()->remove(['logged_in', 'user_id', 'user_type', 'nama', 'username', 'role', 'id_sekolah']);
+    // =====================================================
+    // TIM JURI (nanti dilengkapi)
+    // =====================================================
+    private function dashboardJuri()
+    {
+        return view('admin/juri/dashboard');
+    }
 
-            return redirect()->to('login')
-                ->with('error', 'Hak akses akun Anda tidak dikenali. Silakan hubungi Admin Dinas.');
-        }
-
-        return view($halaman[$role], $data);
+    // =====================================================
+    // GURU (nanti dilengkapi)
+    // =====================================================
+    private function dashboardGuru()
+    {
+        return view('admin/guru/dashboard');
     }
 }
