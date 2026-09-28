@@ -45,8 +45,16 @@ class Cdashboard extends BaseController
             'suara'     => $db->table('suara')->countAllResults(),
         ];
 
-        // Pengumuman (sementara kosong)
-        $data['pengumuman'] = [];
+        // Pengumuman: kompetisi yang membuka pendaftaran & yang hasilnya sudah diumumkan
+        $data['pengumuman'] = $db->table('kompetisi')
+            ->select('id_kompetisi, nama_kompetisi, status, tanggal_selesai, hasil_diumumkan, tanggal_pengumuman')
+            ->groupStart()
+            ->where('status', 'pendaftaran')
+            ->orWhere('hasil_diumumkan', 1)
+            ->groupEnd()
+            ->orderBy('COALESCE(tanggal_pengumuman, updated_at)', 'DESC', false)
+            ->limit(3)
+            ->get()->getResultArray();
 
         // Antrean praktik baik yang menunggu validasi Dinas
         $antrean = $db->table('praktik_baik pb')

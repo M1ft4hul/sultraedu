@@ -8,8 +8,8 @@ $menus = [
     ['label' => 'Praktik Baik',                 'icon' => 'fa-book-open',         'url' => 'praktik-baik',         'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
     ['label' => 'Bank Inovasi',              'icon' => 'fa-box-archive',        'url' => 'bank-inovasi',       'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
     ['label' => 'Kompetisi Inovasi',      'icon' => 'fa-trophy',                'url' => 'kompetisi',                'roles' => 'semua'],
-    ['label' => 'Apresiasi',                    'icon' => 'fa-award',                   'tab' => 'apresiasi',               'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
-    ['label' => 'Monev',                        'icon' => 'fa-chart-line',             'tab' => 'monev',                   'roles' => ['admin_pusat']],
+    ['label' => 'Apresiasi',                    'icon' => 'fa-award',                  'url' => 'apresiasi',               'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
+    ['label' => 'Monev',                        'icon' => 'fa-chart-line',             'url' => 'monev',                   'roles' => ['admin_pusat']],
     ['label' => 'SUARA',                        'icon' => 'fa-comments',          'url' => 'suara',                      'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
 ];
 

@@ -139,10 +139,28 @@
                         </p>
                     </div>
                 <?php else : ?>
-                    <!-- Contoh tampilan pengumuman (nanti diganti data dari database) -->
-                    <div class="bg-slate-50 border-l-4 border-brand-500 p-3.5 rounded-r-lg text-xs space-y-1.5">
-                        <p class="font-bold text-slate-800">Kompetisi Inovasi Pendidikan 2026</p>
-                        <p class="text-slate-600 leading-relaxed">Pendaftaran proposal & unggah video 3 menit dengan tagar <span class="font-bold text-brand-600">#sultraeduvation</span> ditutup tanggal 30 Oktober 2026.</p>
+                    <?php
+                    $bulan = [1 => 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                    $tgl   = fn($d) => date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', strtotime($d))] . ' ' . date('Y', strtotime($d));
+                    ?>
+                    <div class="space-y-3">
+                        <?php foreach ($pengumuman as $p) : ?>
+                            <?php if ($p['hasil_diumumkan']) : ?>
+                                <a href="<?= site_url('apresiasi') . '?kompetisi=' . $p['id_kompetisi'] ?>"
+                                    class="block bg-emerald-50 border-l-4 border-emerald-500 p-3.5 rounded-r-lg text-xs space-y-1 hover:bg-emerald-100 transition">
+                                    <p class="font-bold text-emerald-800"><i class="fa-solid fa-trophy mr-1"></i>Hasil diumumkan</p>
+                                    <p class="font-semibold text-slate-800"><?= esc($p['nama_kompetisi']) ?></p>
+                                    <p class="text-slate-600">Juara telah ditetapkan pada <?= $tgl($p['tanggal_pengumuman']) ?>. Klik untuk melihat pemenang.</p>
+                                </a>
+                            <?php else : ?>
+                                <a href="<?= site_url('kompetisi') ?>"
+                                    class="block bg-slate-50 border-l-4 border-brand-500 p-3.5 rounded-r-lg text-xs space-y-1 hover:bg-slate-100 transition">
+                                    <p class="font-bold text-brand-700"><i class="fa-solid fa-door-open mr-1"></i>Pendaftaran dibuka</p>
+                                    <p class="font-semibold text-slate-800"><?= esc($p['nama_kompetisi']) ?></p>
+                                    <p class="text-slate-600">Pendaftaran ditutup <?= $tgl($p['tanggal_selesai']) ?> dengan tagar <span class="font-bold text-brand-600">#sultraeduvation</span>.</p>
+                                </a>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
             </div>
@@ -153,73 +171,6 @@
                 <button onclick="navTo('suara')" class="w-full bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold py-2.5 rounded-xl shadow transition flex items-center justify-center">
                     <i class="fa-solid fa-paper-plane mr-2"></i>Kirim Aspirasi / Cek Status
                 </button>
-            </div>
-        </div>
-    </div>
-</section>
-<section id="sec-apresiasi" class="hidden space-y-6">
-    <div class="flex flex-wrap justify-between items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <div>
-            <h2 class="text-xl font-bold text-slate-800">Rekam Jejak Apresiasi & Penghargaan</h2>
-            <p class="text-xs text-slate-500">Dokumentasi pengakuan resmi inovasi dari Pemprov, Perguruan Tinggi, DUDI, & Institusi Resmi.</p>
-        </div>
-        <button onclick="openModalApresiasi()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow transition flex items-center">
-            <i class="fa-solid fa-award mr-2"></i>Klaim / Input Apresiasi
-        </button>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="apresiasi-grid">
-    </div>
-</section>
-<section id="sec-monev" class="hidden space-y-6">
-    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <h2 class="text-xl font-bold text-slate-800">Dashboard Monitoring & Evaluasi (Monev)</h2>
-        <p class="text-xs text-slate-500">Pemantauan 10 Indikator Utama Keberlanjutan Ekosistem Inovasi Pendidikan Daerah.</p>
-    </div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 class="text-xs font-bold text-slate-800 mb-3 uppercase tracking-wider"><i class="fa-solid fa-chart-column text-brand-600 mr-2"></i>Partisipasi Sekolah per Kabupaten/Kota</h3>
-            <div class="h-64"><canvas id="chartPartisipasi"></canvas></div>
-        </div>
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 class="text-xs font-bold text-slate-800 mb-3 uppercase tracking-wider"><i class="fa-solid fa-chart-pie text-indigo-600 mr-2"></i>Sebaran Inovasi per Kategori</h3>
-            <div class="h-64"><canvas id="chartKategori"></canvas></div>
-        </div>
-    </div>
-    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <h3 class="font-bold text-slate-800 mb-4 text-sm flex items-center"><i class="fa-solid fa-list-check text-emerald-600 mr-2"></i>Status 10 Indikator Utama Pemantauan (Bab IX)</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-            <div class="p-3 bg-slate-50 border rounded-xl flex justify-between items-center">
-                <span>1. Tingkat Partisipasi Sekolah</span>
-                <span class="font-bold text-emerald-600">78.4% (Tinggi)</span>
-            </div>
-            <div class="p-3 bg-slate-50 border rounded-xl flex justify-between items-center">
-                <span>2. Praktek Baik Terdokumentasi</span>
-                <span class="font-bold text-brand-600">342 Berkas</span>
-            </div>
-            <div class="p-3 bg-slate-50 border rounded-xl flex justify-between items-center">
-                <span>3. Inovasi Masuk Bank Inovasi</span>
-                <span class="font-bold text-indigo-600">96 Terverifikasi</span>
-            </div>
-            <div class="p-3 bg-slate-50 border rounded-xl flex justify-between items-center">
-                <span>4. Perkembangan Implementasi</span>
-                <span class="font-bold text-amber-600">Aktif Pemantauan</span>
-            </div>
-            <div class="p-3 bg-slate-50 border rounded-xl flex justify-between items-center">
-                <span>5. Inovasi Memperoleh Apresiasi</span>
-                <span class="font-bold text-purple-600">18 Inovasi</span>
-            </div>
-            <div class="p-3 bg-slate-50 border rounded-xl flex justify-between items-center">
-                <span>6. Rekapitulasi Kompetisi</span>
-                <span class="font-bold text-blue-600">Gelombang I Berjalan</span>
-            </div>
-            <div class="p-3 bg-slate-50 border rounded-xl flex justify-between items-center">
-                <span>7. Response Rate SUARA</span>
-                <span class="font-bold text-emerald-600">94% Selesai</span>
-            </div>
-            <div class="p-3 bg-slate-50 border rounded-xl flex justify-between items-center">
-                <span>8. Manfaat & Dampak Nyata</span>
-                <span class="font-bold text-slate-700">Terukur (Monev Lapangan)</span>
             </div>
         </div>
     </div>

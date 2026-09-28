@@ -118,6 +118,8 @@
             'praktek-baik': '<?= site_url('praktik-baik') ?>',
             'kompetisi': '<?= site_url('kompetisi') ?>',
             'suara': '<?= site_url('suara') ?>',
+            'apresiasi': '<?= site_url('apresiasi') ?>',
+            'monev': '<?= site_url('monev') ?>',
         };
         if (halamanTerpisah[tabId]) {
             window.location.href = halamanTerpisah[tabId];

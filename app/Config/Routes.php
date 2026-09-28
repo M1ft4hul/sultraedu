@@ -40,6 +40,16 @@ $routes->post('kompetisi/simpan', 'Ckompetisi::simpan');
 $routes->post('kompetisi/status/(:num)', 'Ckompetisi::status/$1');
 $routes->post('kompetisi/hapus/(:num)', 'Ckompetisi::hapus/$1');
 
+// Apresiasi (Admin Dinas)
+$routes->get('apresiasi', 'Capresiasi::index');
+$routes->post('apresiasi/umumkan/(:num)', 'Capresiasi::umumkan/$1');
+$routes->post('apresiasi/piagam/(:num)', 'Capresiasi::piagam/$1');
+
+// Monev (Admin Dinas)
+$routes->get('monev', 'Cmonev::index');
+$routes->post('monev/simpan', 'Cmonev::simpan');
+$routes->post('monev/hapus/(:num)', 'Cmonev::hapus/$1');
+
 // SUARA
 $routes->get('suara', 'Csuara::index');
 $routes->get('suara/export', 'Csuara::export');
