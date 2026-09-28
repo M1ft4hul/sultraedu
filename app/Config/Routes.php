@@ -33,3 +33,13 @@ $routes->post('pengguna/hapus/(:num)', 'Cpengguna::hapus/$1');
 $routes->get('pengguna/export', 'Cpengguna::export');
 $routes->post('pengguna/buat-massal', 'Cpengguna::buatMassal');
 $routes->post('pengguna/reset-massal', 'Cpengguna::resetMassal');
+
+// Kompetisi (Admin Dinas)
+$routes->get('kompetisi', 'Ckompetisi::index');
+$routes->post('kompetisi/simpan', 'Ckompetisi::simpan');
+$routes->post('kompetisi/status/(:num)', 'Ckompetisi::status/$1');
+$routes->post('kompetisi/hapus/(:num)', 'Ckompetisi::hapus/$1');
+
+// SUARA
+$routes->get('suara', 'Csuara::index');
+$routes->get('suara/export', 'Csuara::export');

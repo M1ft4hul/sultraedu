@@ -7,10 +7,10 @@ $menus = [
     ['label' => 'Beranda',                      'icon' => 'fa-house',                   'url' => 'dashboard',           'roles' => 'semua'],
     ['label' => 'Praktik Baik',                 'icon' => 'fa-book-open',         'url' => 'praktik-baik',         'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
     ['label' => 'Bank Inovasi',              'icon' => 'fa-box-archive',        'url' => 'bank-inovasi',       'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
-    ['label' => 'Kompetisi Inovasi',     'icon' => 'fa-trophy',                 'tab' => 'kompetisi',              'roles' => 'semua'],
+    ['label' => 'Kompetisi Inovasi',      'icon' => 'fa-trophy',                'url' => 'kompetisi',                'roles' => 'semua'],
     ['label' => 'Apresiasi',                    'icon' => 'fa-award',                   'tab' => 'apresiasi',               'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
     ['label' => 'Monev',                        'icon' => 'fa-chart-line',             'tab' => 'monev',                   'roles' => ['admin_pusat']],
-    ['label' => 'SUARA',                        'icon' => 'fa-comments',          'tab' => 'suara',                      'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
+    ['label' => 'SUARA',                        'icon' => 'fa-comments',          'url' => 'suara',                      'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
 ];
 
 $boleh   = fn($m) => $m['roles'] === 'semua' || in_array($role, $m['roles'], true);

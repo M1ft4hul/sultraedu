@@ -116,6 +116,8 @@
         // Menu yang sudah punya halaman sendiri
         const halamanTerpisah = {
             'praktek-baik': '<?= site_url('praktik-baik') ?>',
+            'kompetisi': '<?= site_url('kompetisi') ?>',
+            'suara': '<?= site_url('suara') ?>',
         };
         if (halamanTerpisah[tabId]) {
             window.location.href = halamanTerpisah[tabId];
