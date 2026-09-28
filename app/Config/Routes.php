@@ -20,3 +20,10 @@ $routes->get('sekolah', 'Csekolah::index');
 $routes->post('sekolah/simpan', 'Csekolah::simpan');
 $routes->post('sekolah/status/(:num)', 'Csekolah::status/$1');
 $routes->post('sekolah/hapus/(:num)', 'Csekolah::hapus/$1');
+
+// Akun Admin Sekolah (Admin Dinas/Pusat)
+$routes->get('pengguna', 'Cpengguna::index');
+$routes->post('pengguna/simpan', 'Cpengguna::simpan');
+$routes->post('pengguna/status/(:num)', 'Cpengguna::status/$1');
+$routes->post('pengguna/hapus/(:num)', 'Cpengguna::hapus/$1');
+$routes->get('pengguna/export', 'Cpengguna::export');
