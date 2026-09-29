@@ -63,10 +63,133 @@ class Capresiasi extends BaseController
     // =====================================================
     public function index()
     {
-        if (! $this->bolehAkses()) {
-            return redirect()->to('dashboard');
+        if (! session()->get('logged_in')) {
+            return redirect()->to('login');
         }
 
+        switch (session()->get('role')) {
+            case 'admin_pusat':
+                return $this->indexDinas();
+            case 'admin_sekolah':
+                return $this->indexSekolah();
+        }
+
+        return redirect()->to('dashboard');
+    }
+
+    // =====================================================
+    // ADMIN SEKOLAH: lihat juara & status piagam
+    // =====================================================
+    private function indexSekolah()
+    {
+        $db        = \Config\Database::connect();
+        $idSekolah = (int) session()->get('id_sekolah');
+
+        // Semua karya sekolah ini di seluruh kompetisi (kecuali yang masih draft)
+        $rows = $db->table('kompetisi_peserta p')
+            ->select('p.id_peserta, p.judul_karya, p.deskripsi_karya, p.link_video, p.peringkat, p.nilai, p.status_validasi,
+                      k.id_kompetisi, k.nama_kompetisi, k.tanggal_mulai, k.status AS status_kompetisi,
+                      k.hasil_diumumkan, k.tanggal_pengumuman,
+                      kk.nama_kategori, g.nama_guru, g.nip, g.mapel,
+                      a.id_apresiasi, a.bukti_file, a.updated_at AS tanggal_piagam')
+            ->join('kompetisi k', 'k.id_kompetisi = p.id_kompetisi')
+            ->join('kompetisi_kategori kk', 'kk.id_kategori = p.id_kategori', 'left')
+            ->join('guru g', 'g.id_guru = p.id_guru', 'left')
+            ->join('apresiasi a', 'a.id_peserta = p.id_peserta', 'left')
+            ->where('p.id_sekolah', $idSekolah)
+            ->where('k.status !=', 'draft')
+            ->orderBy('k.tanggal_mulai', 'DESC')
+            ->orderBy('p.peringkat IS NULL', 'ASC', false)
+            ->orderBy('p.peringkat', 'ASC')
+            ->get()->getResultArray();
+
+        // Rincian nilai per kriteria (rata-rata semua juri), hanya untuk hasil yang sudah diumumkan
+        $idDiumumkan = array_column(array_filter($rows, fn ($r) => $r['hasil_diumumkan']), 'id_peserta');
+        $rincian     = [];
+
+        if ($idDiumumkan) {
+            $nilaiKriteria = $db->table('kompetisi_nilai n')
+                ->select('n.id_peserta, kr.nama_kriteria, kr.skor_maks, kr.urutan, ROUND(AVG(n.skor), 2) AS skor')
+                ->join('kompetisi_kriteria kr', 'kr.id_kriteria = n.id_kriteria')
+                ->whereIn('n.id_peserta', $idDiumumkan)
+                ->groupBy('n.id_peserta, kr.id_kriteria, kr.nama_kriteria, kr.skor_maks, kr.urutan')
+                ->orderBy('kr.urutan', 'ASC')
+                ->get()->getResultArray();
+
+            foreach ($nilaiKriteria as $n) {
+                $rincian[$n['id_peserta']][] = [
+                    'kriteria'  => $n['nama_kriteria'],
+                    'skor'      => (float) $n['skor'],
+                    'skor_maks' => (int) $n['skor_maks'],
+                ];
+            }
+        }
+
+        // Nilai & peringkat disembunyikan sebelum hasil diumumkan
+        foreach ($rows as &$r) {
+            if (! $r['hasil_diumumkan']) {
+                $r['peringkat'] = null;
+                $r['nilai']     = null;
+            }
+            $r['rincian'] = $rincian[$r['id_peserta']] ?? [];
+        }
+        unset($r);
+
+        // ---------- Filter tahun & kompetisi ----------
+        foreach ($rows as &$r) {
+            $r['tahun'] = date('Y', strtotime($r['tanggal_mulai']));
+        }
+        unset($r);
+
+        $daftarTahun = array_values(array_unique(array_column($rows, 'tahun')));
+        rsort($daftarTahun);
+
+        // Default: tahun terbaru yang punya data
+        $tahun = (string) ($this->request->getGet('tahun') ?? ($daftarTahun[0] ?? 'semua'));
+        if ($tahun !== 'semua' && ! in_array($tahun, $daftarTahun, true)) {
+            $tahun = $daftarTahun[0] ?? 'semua';
+        }
+
+        // Pilihan kompetisi menyesuaikan tahun
+        $kompetisi = [];
+        foreach ($rows as $r) {
+            if ($tahun === 'semua' || $r['tahun'] === $tahun) {
+                $kompetisi[$r['id_kompetisi']] = $r['nama_kompetisi'];
+            }
+        }
+
+        $idKompetisi = (string) $this->request->getGet('kompetisi');
+        if (! isset($kompetisi[$idKompetisi])) {
+            $idKompetisi = '';
+        }
+
+        $rows = array_values(array_filter($rows, fn ($r) =>
+            ($tahun === 'semua' || $r['tahun'] === $tahun)
+            && ($idKompetisi === '' || (string) $r['id_kompetisi'] === $idKompetisi)
+        ));
+
+        // Kartu prestasi = karya yang menjadi juara
+        $prestasi = array_values(array_filter($rows, fn ($r) => $r['id_apresiasi'] !== null));
+
+        return view('admin/sekolah/apresiasi', [
+            'prestasi'    => $prestasi,
+            'riwayat'     => $rows,
+            'kompetisi'   => $kompetisi,
+            'daftarTahun' => $daftarTahun,
+            'filter'      => ['tahun' => $tahun, 'kompetisi' => $idKompetisi],
+            'ringkas'     => [
+                'ikut'     => count($rows),
+                'juara'    => count($prestasi),
+                'tersedia' => count(array_filter($prestasi, fn ($p) => ! empty($p['bukti_file']))),
+            ],
+        ]);
+    }
+
+    // =====================================================
+    // ADMIN DINAS: umumkan juara & unggah piagam
+    // =====================================================
+    private function indexDinas()
+    {
         $db = \Config\Database::connect();
 
         // Hanya kompetisi yang sudah selesai (penjurian tuntas)

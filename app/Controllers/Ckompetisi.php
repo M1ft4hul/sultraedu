@@ -54,10 +54,113 @@ class Ckompetisi extends BaseController
     // =====================================================
     public function index()
     {
-        if (! $this->bolehAkses()) {
-            return redirect()->to('dashboard');
+        if (! session()->get('logged_in')) {
+            return redirect()->to('login');
         }
 
+        switch (session()->get('role')) {
+            case 'admin_pusat':
+                return $this->indexDinas();
+            case 'admin_sekolah':
+                return $this->indexSekolah();
+        }
+
+        return redirect()->to('dashboard');
+    }
+
+    // =====================================================
+    // ADMIN SEKOLAH: lihat jadwal, tahapan, dan peserta
+    // =====================================================
+    private function indexSekolah()
+    {
+        $db        = \Config\Database::connect();
+        $idSekolah = (int) session()->get('id_sekolah');
+
+        // Tab: "berjalan" (pendaftaran & penjurian) atau "riwayat" (sudah selesai)
+        $tab       = $this->request->getGet('tab') === 'riwayat' ? 'riwayat' : 'berjalan';
+        $statusTab = [
+            'berjalan' => ['pendaftaran', 'berlangsung'],
+            'riwayat'  => ['selesai'],
+        ];
+
+        $builder = $db->table('kompetisi')
+            ->select('id_kompetisi, nama_kompetisi, deskripsi, tanggal_mulai, tanggal_selesai, status, hasil_diumumkan, tanggal_pengumuman')
+            ->whereIn('status', $statusTab[$tab]);
+
+        // Berjalan: tenggat terdekat di atas. Riwayat: yang terbaru selesai di atas.
+        $kompetisi = $tab === 'berjalan'
+            ? $builder->orderBy('tanggal_selesai', 'ASC')->get()->getResultArray()
+            : $builder->orderBy('tanggal_selesai', 'DESC')->get()->getResultArray();
+
+        $jumlahTab = [];
+        foreach ($statusTab as $kunci => $daftarStatus) {
+            $jumlahTab[$kunci] = $db->table('kompetisi')->whereIn('status', $daftarStatus)->countAllResults();
+        }
+
+        $ids      = array_column($kompetisi, 'id_kompetisi');
+        $peserta  = [];
+        $kategori = [];
+
+        if ($ids) {
+            // Peserta (yang ditolak Dinas tidak ditampilkan)
+            $rows = $db->table('kompetisi_peserta p')
+                ->select('p.id_kompetisi, p.id_sekolah, p.judul_karya, p.peringkat, p.nilai, p.status_validasi,
+                          s.nama_sekolah, s.kabupaten_kota, k.nama_kategori, k.urutan')
+                ->join('sekolah s', 's.id_sekolah = p.id_sekolah', 'left')
+                ->join('kompetisi_kategori k', 'k.id_kategori = p.id_kategori', 'left')
+                ->whereIn('p.id_kompetisi', $ids)
+                ->where('p.status_validasi !=', 'ditolak')
+                ->orderBy('k.urutan', 'ASC')
+                ->orderBy('s.nama_sekolah', 'ASC')
+                ->get()->getResultArray();
+            foreach ($rows as $r) {
+                $peserta[$r['id_kompetisi']][] = $r;
+            }
+
+            $rows = $db->table('kompetisi_kategori')->select('id_kompetisi, nama_kategori')
+                ->whereIn('id_kompetisi', $ids)->orderBy('urutan', 'ASC')->get()->getResultArray();
+            foreach ($rows as $r) {
+                $kategori[$r['id_kompetisi']][] = $r['nama_kategori'];
+            }
+        }
+
+        foreach ($kompetisi as &$k) {
+            $daftar = $peserta[$k['id_kompetisi']] ?? [];
+
+            // Nilai & peringkat disembunyikan sebelum hasil diumumkan
+            if (! $k['hasil_diumumkan']) {
+                foreach ($daftar as &$d) {
+                    $d['peringkat'] = null;
+                    $d['nilai']     = null;
+                }
+                unset($d);
+            }
+            foreach ($daftar as &$d) {
+                $d['milik_sendiri'] = (int) $d['id_sekolah'] === $idSekolah;
+                unset($d['id_sekolah']);
+            }
+            unset($d);
+
+            $k['peserta']        = $daftar;
+            $k['kategori']       = $kategori[$k['id_kompetisi']] ?? [];
+            $k['jumlah_sekolah'] = count(array_unique(array_column($daftar, 'nama_sekolah')));
+            $k['karya_sendiri']  = count(array_filter($daftar, fn($d) => $d['milik_sendiri']));
+        }
+        unset($k);
+
+        return view('admin/sekolah/kompetisi', [
+            'kompetisi' => $kompetisi,
+            'label'     => self::STATUS,
+            'tab'       => $tab,
+            'jumlahTab' => $jumlahTab,
+        ]);
+    }
+
+    // =====================================================
+    // ADMIN DINAS: kelola kompetisi
+    // =====================================================
+    private function indexDinas()
+    {
         $db = \Config\Database::connect();
 
         $kompetisi = $db->table('kompetisi k')

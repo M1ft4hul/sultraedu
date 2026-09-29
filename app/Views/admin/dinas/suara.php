@@ -122,7 +122,7 @@ $adaFilter = array_filter($filter);
                         <div class="flex-1 min-w-0 space-y-1">
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <span class="font-bold text-slate-800"><?= esc($d['pengirim']) ?></span>
-                                <span class="text-[10px] px-2 py-0.5 rounded-full <?= $d['jenis_pengirim'] === 'Guru' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-500' ?>">
+                                <span class="text-[10px] px-2 py-0.5 rounded-full <?= ['Guru' => 'bg-violet-50 text-violet-700', 'Admin Sekolah' => 'bg-blue-50 text-blue-700'][$d['jenis_pengirim']] ?? 'bg-slate-100 text-slate-500' ?>">
                                     <?= $d['jenis_pengirim'] ?>
                                 </span>
                                 <?php if ($d['nama_sekolah']) : ?>
@@ -218,7 +218,10 @@ $adaFilter = array_filter($filter);
         const jenis = document.getElementById('s_jenis');
         jenis.textContent = d.jenis_pengirim;
         jenis.className = 'text-[10px] px-2 py-0.5 rounded-full ml-1 ' +
-            (d.jenis_pengirim === 'Guru' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-500');
+            ({
+                'Guru': 'bg-violet-50 text-violet-700',
+                'Admin Sekolah': 'bg-blue-50 text-blue-700'
+            } [d.jenis_pengirim] || 'bg-slate-100 text-slate-500');
 
         document.getElementById('s_nip_wrap').classList.toggle('hidden', !d.nip);
         isi('s_nip', d.nip);
