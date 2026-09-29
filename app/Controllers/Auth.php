@@ -48,7 +48,7 @@ class Auth extends BaseController
             $this->simpanSession([
                 'user_id'    => $admin['id_admin'],
                 'user_type'  => 'admin',
-                'namaAdmin'       => $admin['nama_admin'],
+                'namaAdmin'     => $admin['nama_admin'],
                 'username'   => $admin['username'],
                 'role'       => $admin['role'], // admin_pusat / admin_sekolah / tim_juri
                 'id_sekolah' => $admin['id_sekolah'],

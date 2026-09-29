@@ -46,15 +46,7 @@ class Cdashboard extends BaseController
         ];
 
         // Pengumuman: kompetisi yang membuka pendaftaran & yang hasilnya sudah diumumkan
-        $data['pengumuman'] = $db->table('kompetisi')
-            ->select('id_kompetisi, nama_kompetisi, status, tanggal_selesai, hasil_diumumkan, tanggal_pengumuman')
-            ->groupStart()
-            ->where('status', 'pendaftaran')
-            ->orWhere('hasil_diumumkan', 1)
-            ->groupEnd()
-            ->orderBy('COALESCE(tanggal_pengumuman, updated_at)', 'DESC', false)
-            ->limit(3)
-            ->get()->getResultArray();
+        $data['pengumuman'] = $this->ambilPengumuman($db);
 
         // Antrean praktik baik yang menunggu validasi Dinas
         $antrean = $db->table('praktik_baik pb')
@@ -71,11 +63,69 @@ class Cdashboard extends BaseController
     }
 
     // =====================================================
-    // ADMIN SEKOLAH (nanti dilengkapi)
+    // PENGUMUMAN (dipakai bersama semua dashboard)
+    // =====================================================
+    private function ambilPengumuman($db): array
+    {
+        return $db->table('kompetisi')
+            ->select('id_kompetisi, nama_kompetisi, status, tanggal_selesai, hasil_diumumkan, tanggal_pengumuman')
+            ->groupStart()
+            ->where('status', 'pendaftaran')
+            ->orWhere('hasil_diumumkan', 1)
+            ->groupEnd()
+            ->orderBy('COALESCE(tanggal_pengumuman, updated_at)', 'DESC', false)
+            ->limit(3)
+            ->get()->getResultArray();
+    }
+
+    // =====================================================
+    // ADMIN SEKOLAH
     // =====================================================
     private function dashboardSekolah()
     {
-        return view('admin/sekolah/dashboard');
+        $db        = \Config\Database::connect();
+        $idSekolah = session()->get('id_sekolah');
+
+        // Identitas sekolah
+        $data['sekolah'] = $db->table('sekolah')
+            ->select('nama_sekolah, npsn, jenjang, kabupaten_kota')
+            ->where('id_sekolah', $idSekolah)
+            ->get()->getRowArray();
+
+        // Statistik khusus sekolah ini
+        $data['stat'] = [
+            'guru'           => $db->table('guru')->where('id_sekolah', $idSekolah)->where('status', 'aktif')->countAllResults(),
+            'tungguSekolah'  => $db->table('praktik_baik')->where('id_sekolah', $idSekolah)->where('status_verifikasi_sekolah', 'menunggu')->countAllResults(),
+            'praktik'        => $db->table('praktik_baik')->where('id_sekolah', $idSekolah)->where('status_verifikasi_dinas', 'disetujui')->countAllResults(),
+            'inovasi'        => $db->table('bank_inovasi')->where('id_sekolah', $idSekolah)->where('status_verifikasi', 'disetujui')->countAllResults(),
+            'juara'          => $db->table('apresiasi')->where('id_sekolah', $idSekolah)->countAllResults(),
+        ];
+
+        // Antrean verifikasi tahap 1 (paling lama menunggu di atas)
+        $data['antrean'] = $db->table('praktik_baik pb')
+            ->select('pb.id_praktik_baik, pb.judul, pb.kategori, pb.tanggal_upload, g.nama_guru')
+            ->join('guru g', 'g.id_guru = pb.id_guru', 'left')
+            ->where('pb.id_sekolah', $idSekolah)
+            ->where('pb.status_verifikasi_sekolah', 'menunggu')
+            ->orderBy('pb.tanggal_upload', 'ASC')
+            ->limit(5)
+            ->get()->getResultArray();
+
+        // Prestasi sekolah dari kompetisi
+        $data['juara'] = $db->table('apresiasi a')
+            ->select('a.jenis_apresiasi, a.bukti_file, p.judul_karya, g.nama_guru, k.nama_kompetisi')
+            ->join('kompetisi_peserta p', 'p.id_peserta = a.id_peserta')
+            ->join('kompetisi k', 'k.id_kompetisi = p.id_kompetisi')
+            ->join('guru g', 'g.id_guru = p.id_guru', 'left')
+            ->where('a.id_sekolah', $idSekolah)
+            ->orderBy('k.tanggal_selesai', 'DESC')
+            ->orderBy('p.peringkat', 'ASC')
+            ->limit(5)
+            ->get()->getResultArray();
+
+        $data['pengumuman'] = $this->ambilPengumuman($db);
+
+        return view('admin/sekolah/dashboard', $data);
     }
 
     // =====================================================
