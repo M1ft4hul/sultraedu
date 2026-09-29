@@ -4,14 +4,18 @@ namespace App\Controllers;
 
 class Cmonev extends BaseController
 {
-    // Usulan aspek pemantauan (tetap bisa diketik bebas)
+    // Usulan fokus monitoring (tetap bisa diketik bebas)
     public const ASPEK = [
-        'Implementasi Praktik Baik',
         'Keberlanjutan Inovasi',
+        'Implementasi di Sekolah',
         'Dampak bagi Peserta Didik',
-        'Pemanfaatan Platform EDUVATION',
-        'Kesiapan Replikasi',
-        'Tindak Lanjut Hasil Kompetisi',
+        'Kesiapan Replikasi ke Sekolah Lain',
+        'Tindak Lanjut Rekomendasi Juri',
+    ];
+
+    public const STATUS = [
+        'dijadwalkan' => 'Dijadwalkan',
+        'selesai'     => 'Selesai',
     ];
 
     private function bolehAkses(): bool
@@ -41,7 +45,7 @@ class Cmonev extends BaseController
         )->getRow()->n;
 
         $indikator = [
-            'partisipasi' => $sekolahAktif ? round($sekolahBerpartisipasi / $sekolahAktif * 100, 1) : 0,
+            'partisipasi'   => $sekolahAktif ? round($sekolahBerpartisipasi / $sekolahAktif * 100, 1) : 0,
             'sekolahAktif'  => $sekolahAktif,
             'sekolahIkut'   => $sekolahBerpartisipasi,
             'praktik'       => $db->table('praktik_baik')->where('status_verifikasi_dinas', 'disetujui')->countAllResults(),
@@ -50,7 +54,6 @@ class Cmonev extends BaseController
             'apresiasi'     => $db->table('apresiasi')->countAllResults(),
             'peserta'       => $db->table('kompetisi_peserta')->countAllResults(),
             'suara'         => $db->table('suara')->countAllResults(),
-            'monev'         => $db->table('monev')->countAllResults(),
         ];
 
         // ---------- Sebaran per kabupaten/kota ----------
@@ -71,51 +74,76 @@ class Cmonev extends BaseController
             $perKab[$r['kabupaten_kota']]['ikut']    = (int) $r['ikut'];
         }
 
-        $rows = $db->query(
-            "SELECT s.kabupaten_kota, COUNT(*) AS n
-             FROM praktik_baik pb JOIN sekolah s ON s.id_sekolah = pb.id_sekolah
-             WHERE pb.status_verifikasi_dinas = 'disetujui'
-             GROUP BY s.kabupaten_kota"
-        )->getResultArray();
-        foreach ($rows as $r) {
-            $perKab[$r['kabupaten_kota']]['praktik'] = (int) $r['n'];
+        foreach (
+            [
+                'praktik' => "SELECT s.kabupaten_kota, COUNT(*) AS n FROM praktik_baik pb JOIN sekolah s ON s.id_sekolah = pb.id_sekolah
+                          WHERE pb.status_verifikasi_dinas = 'disetujui' GROUP BY s.kabupaten_kota",
+                'inovasi' => "SELECT s.kabupaten_kota, COUNT(*) AS n FROM bank_inovasi bi JOIN sekolah s ON s.id_sekolah = bi.id_sekolah
+                          WHERE bi.status_verifikasi = 'disetujui' GROUP BY s.kabupaten_kota",
+            ] as $kunci => $sql
+        ) {
+            foreach ($db->query($sql)->getResultArray() as $r) {
+                $perKab[$r['kabupaten_kota']][$kunci] = (int) $r['n'];
+            }
         }
 
-        $rows = $db->query(
-            "SELECT s.kabupaten_kota, COUNT(*) AS n
-             FROM bank_inovasi bi JOIN sekolah s ON s.id_sekolah = bi.id_sekolah
-             WHERE bi.status_verifikasi = 'disetujui'
-             GROUP BY s.kabupaten_kota"
-        )->getResultArray();
-        foreach ($rows as $r) {
-            $perKab[$r['kabupaten_kota']]['inovasi'] = (int) $r['n'];
-        }
-
-        // ---------- Catatan monev lapangan ----------
-        $filterSekolah = (string) $this->request->getGet('sekolah');
+        // ---------- Jadwal monitoring ----------
+        $filterKompetisi = (string) $this->request->getGet('kompetisi');
 
         $builder = $db->table('monev m')
-            ->select('m.*, s.nama_sekolah, s.kabupaten_kota, a.nama_admin AS pencatat')
-            ->join('sekolah s', 's.id_sekolah = m.id_sekolah', 'left')
-            ->join('admin a', 'a.id_admin = m.id_penanggung_jawab', 'left');
-        if ($filterSekolah !== '') {
-            $builder->where('m.id_sekolah', $filterSekolah);
+            ->select('m.id_monev, m.id_peserta, m.tanggal_monev, m.aspek_monev, m.deskripsi, m.status,
+                      m.hasil_temuan, m.rekomendasi, m.file_hasil, m.tanggal_hasil,
+                      p.judul_karya, p.peringkat, k.id_kompetisi, k.nama_kompetisi,
+                      s.nama_sekolah, s.kabupaten_kota, g.nama_guru')
+            ->join('kompetisi_peserta p', 'p.id_peserta = m.id_peserta')
+            ->join('kompetisi k', 'k.id_kompetisi = p.id_kompetisi')
+            ->join('sekolah s', 's.id_sekolah = p.id_sekolah', 'left')
+            ->join('guru g', 'g.id_guru = p.id_guru', 'left');
+        if ($filterKompetisi !== '') {
+            $builder->where('k.id_kompetisi', $filterKompetisi);
         }
-        $catatan = $builder->orderBy('m.tanggal_monev', 'DESC')->get()->getResultArray();
+        // Yang masih dijadwalkan di atas, lalu tanggal terdekat
+        $jadwal = $builder->orderBy("m.status = 'dijadwalkan'", 'DESC', false)
+            ->orderBy('m.tanggal_monev', 'ASC')
+            ->get()->getResultArray();
+
+        // Kompetisi yang sudah diumumkan beserta pesertanya (untuk form)
+        $kompetisi = $db->table('kompetisi')
+            ->select('id_kompetisi, nama_kompetisi')
+            ->where('hasil_diumumkan', 1)
+            ->orderBy('tanggal_pengumuman', 'DESC')
+            ->get()->getResultArray();
+
+        $peserta = [];
+        if ($kompetisi) {
+            $rows = $db->table('kompetisi_peserta p')
+                ->select('p.id_peserta, p.id_kompetisi, p.judul_karya, p.peringkat, p.nilai, s.nama_sekolah')
+                ->join('sekolah s', 's.id_sekolah = p.id_sekolah', 'left')
+                ->whereIn('p.id_kompetisi', array_column($kompetisi, 'id_kompetisi'))
+                ->where('p.status_validasi', 'tervalidasi')
+                ->orderBy('p.peringkat IS NULL', 'ASC', false)
+                ->orderBy('p.peringkat', 'ASC')
+                ->orderBy('p.nilai', 'DESC')
+                ->get()->getResultArray();
+            foreach ($rows as $r) {
+                $peserta[$r['id_kompetisi']][] = $r;
+            }
+        }
 
         return view('admin/dinas/monev', [
-            'indikator'     => $indikator,
-            'perKab'        => $perKab,
-            'catatan'       => $catatan,
-            'filterSekolah' => $filterSekolah,
-            'aspek'         => self::ASPEK,
-            'sekolah'       => $db->table('sekolah')->select('id_sekolah, nama_sekolah, kabupaten_kota')
-                ->orderBy('nama_sekolah', 'ASC')->get()->getResultArray(),
+            'indikator'       => $indikator,
+            'perKab'          => $perKab,
+            'jadwal'          => $jadwal,
+            'filterKompetisi' => $filterKompetisi,
+            'kompetisi'       => $kompetisi,
+            'peserta'         => $peserta,
+            'aspek'           => self::ASPEK,
+            'labelStatus'     => self::STATUS,
         ]);
     }
 
     // =====================================================
-    // SIMPAN CATATAN MONEV (tambah / edit)
+    // SIMPAN JADWAL (buat banyak sekaligus, atau edit satu)
     // =====================================================
     public function simpan()
     {
@@ -123,57 +151,81 @@ class Cmonev extends BaseController
             return redirect()->to('dashboard');
         }
 
+        $db    = \Config\Database::connect();
         $id    = (int) $this->request->getPost('id_monev');
         $input = [
-            'id_sekolah'    => (string) $this->request->getPost('id_sekolah'),
             'tanggal_monev' => (string) $this->request->getPost('tanggal_monev'),
             'aspek_monev'   => trim((string) $this->request->getPost('aspek_monev')),
             'deskripsi'     => trim((string) $this->request->getPost('deskripsi')),
-            'hasil_temuan'  => trim((string) $this->request->getPost('hasil_temuan')),
-            'rekomendasi'   => trim((string) $this->request->getPost('rekomendasi')),
         ];
 
-        $rules = [
-            'id_sekolah'    => 'required|is_not_unique[sekolah.id_sekolah]',
+        $valid = $this->validateData($input, [
             'tanggal_monev' => 'required|valid_date[Y-m-d]',
             'aspek_monev'   => 'required|max_length[150]',
-            'hasil_temuan'  => 'required',
-        ];
-        $pesan = [
-            'id_sekolah'    => ['required' => 'Sekolah wajib dipilih.', 'is_not_unique' => 'Sekolah tidak ditemukan.'],
-            'tanggal_monev' => ['required' => 'Tanggal monev wajib diisi.', 'valid_date' => 'Format tanggal tidak valid.'],
-            'aspek_monev'   => ['required' => 'Aspek yang dipantau wajib diisi.'],
-            'hasil_temuan'  => ['required' => 'Hasil temuan wajib diisi.'],
-        ];
+        ], [
+            'tanggal_monev' => ['required' => 'Tanggal monitoring wajib diisi.', 'valid_date' => 'Format tanggal tidak valid.'],
+            'aspek_monev'   => ['required' => 'Fokus monitoring wajib diisi.'],
+        ]);
 
-        if (! $this->validateData($input, $rules, $pesan)) {
+        if (! $valid) {
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
 
-        $db       = \Config\Database::connect();
         $sekarang = date('Y-m-d H:i:s');
         $data     = $input + [
-            'deskripsi'   => $input['deskripsi'] ?: null,
-            'rekomendasi' => $input['rekomendasi'] ?: null,
-            'updated_at'  => $sekarang,
+            'deskripsi'  => $input['deskripsi'] ?: null,
+            'updated_at' => $sekarang,
         ];
+        $data['deskripsi'] = $input['deskripsi'] ?: null;
 
+        // ---------- Edit satu jadwal ----------
         if ($id > 0) {
+            $lama = $db->table('monev')->where('id_monev', $id)->get()->getRowArray();
+            if (! $lama || $lama['status'] !== 'dijadwalkan') {
+                return redirect()->to('monev')->with('gagal', 'Jadwal yang sudah selesai tidak bisa diubah.');
+            }
             $db->table('monev')->where('id_monev', $id)->update($data);
-            $pesanSukses = 'Catatan monev berhasil diperbarui.';
-        } else {
-            $db->table('monev')->insert($data + [
-                'id_penanggung_jawab' => session()->get('user_id'),
-                'created_at'          => $sekarang,
-            ]);
-            $pesanSukses = 'Catatan monev berhasil ditambahkan.';
+
+            return redirect()->to(site_url('monev') . '#jadwal')->with('sukses', 'Jadwal monitoring berhasil diperbarui.');
         }
 
-        return redirect()->to(site_url('monev') . '#catatan')->with('sukses', $pesanSukses);
+        // ---------- Buat jadwal untuk beberapa karya sekaligus ----------
+        $dipilih = array_map('intval', (array) $this->request->getPost('peserta'));
+        if (empty($dipilih)) {
+            return redirect()->back()->withInput()->with('errors', ['Pilih minimal satu karya yang akan dimonitoring.']);
+        }
+
+        // Hanya karya tervalidasi dari kompetisi yang sudah diumumkan
+        $peserta = $db->table('kompetisi_peserta p')
+            ->select('p.id_peserta, p.id_sekolah')
+            ->join('kompetisi k', 'k.id_kompetisi = p.id_kompetisi')
+            ->where('k.hasil_diumumkan', 1)
+            ->where('p.status_validasi', 'tervalidasi')
+            ->whereIn('p.id_peserta', $dipilih)
+            ->get()->getResultArray();
+
+        if (empty($peserta)) {
+            return redirect()->back()->withInput()->with('errors', ['Karya yang dipilih tidak valid.']);
+        }
+
+        $baris = [];
+        foreach ($peserta as $p) {
+            $baris[] = $data + [
+                'id_peserta'       => $p['id_peserta'],
+                'id_sekolah'       => $p['id_sekolah'],
+                'id_admin_pembuat' => session()->get('user_id'),
+                'status'           => 'dijadwalkan',
+                'created_at'       => $sekarang,
+            ];
+        }
+        $db->table('monev')->insertBatch($baris);
+
+        return redirect()->to(site_url('monev') . '#jadwal')
+            ->with('sukses', count($baris) . ' jadwal monitoring berhasil dibuat.');
     }
 
     // =====================================================
-    // HAPUS CATATAN MONEV
+    // HAPUS JADWAL (hanya yang belum selesai)
     // =====================================================
     public function hapus($id)
     {
@@ -181,8 +233,15 @@ class Cmonev extends BaseController
             return redirect()->to('dashboard');
         }
 
-        \Config\Database::connect()->table('monev')->where('id_monev', $id)->delete();
+        $db   = \Config\Database::connect();
+        $lama = $db->table('monev')->where('id_monev', $id)->get()->getRowArray();
 
-        return redirect()->to(site_url('monev') . '#catatan')->with('sukses', 'Catatan monev berhasil dihapus.');
+        if (! $lama || $lama['status'] !== 'dijadwalkan') {
+            return redirect()->to('monev')->with('gagal', 'Jadwal yang sudah selesai tidak bisa dihapus.');
+        }
+
+        $db->table('monev')->where('id_monev', $id)->delete();
+
+        return redirect()->to(site_url('monev') . '#jadwal')->with('sukses', 'Jadwal monitoring berhasil dihapus.');
     }
 }

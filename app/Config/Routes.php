@@ -58,3 +58,6 @@ $routes->get('suara/export', 'Csuara::export');
 $routes->get('profil', 'Cprofil::index');
 $routes->post('profil/simpan', 'Cprofil::simpan');
 $routes->post('profil/password', 'Cprofil::password');
+
+$routes->post('profil/tim', 'Cprofil::tambahAdmin');
+$routes->post('profil/tim/status/(:num)', 'Cprofil::statusAdmin/$1');

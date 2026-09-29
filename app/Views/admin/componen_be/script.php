@@ -621,6 +621,10 @@
     window.onload = function() {
         aturTampilanRole();
         renderAllViews();
-        if (location.hash) navTo(location.hash.substring(1));
+        // Hanya buka tab kalau section-nya memang ada di halaman ini
+        const tabDariUrl = location.hash.substring(1);
+        if (tabDariUrl && document.getElementById('sec-' + tabDariUrl)) {
+            navTo(tabDariUrl);
+        }
     };
 </script>

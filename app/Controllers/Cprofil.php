@@ -54,7 +54,18 @@ class Cprofil extends BaseController
 
         unset($akun['password']); // hash password tidak dikirim ke halaman
 
+        // Khusus Admin Dinas: daftar tim Admin Dinas
+        $timDinas = null;
+        if (session()->get('role') === 'admin_pusat') {
+            $timDinas = (new AdminModel())
+                ->select('id_admin, nama_admin, username, email, status, created_at')
+                ->where('role', 'admin_pusat')
+                ->orderBy('created_at', 'ASC')
+                ->findAll();
+        }
+
         return view('admin/profil', [
+            'timDinas'  => $timDinas,
             'akun'      => $akun,
             'isGuru'    => $this->isGuru(),
             'nama'      => $this->isGuru() ? $akun['nama_guru'] : $akun['nama_admin'],
@@ -159,5 +170,106 @@ class Cprofil extends BaseController
         $this->model()->update(session()->get('user_id'), ['password' => $input['password_baru']]);
 
         return redirect()->to('profil')->with('sukses', 'Password berhasil diubah. Gunakan password baru saat login berikutnya.');
+    }
+
+    // =====================================================
+    // TIM ADMIN DINAS: tambah akun
+    // =====================================================
+    public function tambahAdmin()
+    {
+        if (! session()->get('logged_in') || session()->get('role') !== 'admin_pusat') {
+            return redirect()->to('dashboard');
+        }
+
+        $input = [
+            'nama_admin' => trim((string) $this->request->getPost('nama_admin')),
+            'username'   => strtolower(trim((string) $this->request->getPost('username'))),
+            'email'      => trim((string) $this->request->getPost('email')),
+            'password'   => (string) $this->request->getPost('password'),
+        ];
+
+        $valid = $this->validateData($input, [
+            'nama_admin' => 'required|max_length[100]',
+            'username'   => 'required|min_length[4]|max_length[50]|alpha_dash|is_unique[admin.username]',
+            'email'      => 'permit_empty|valid_email|max_length[100]',
+            'password'   => 'required|min_length[8]',
+        ], [
+            'nama_admin' => ['required' => 'Nama lengkap wajib diisi.'],
+            'username'   => [
+                'required'   => 'Username wajib diisi.',
+                'min_length' => 'Username minimal 4 karakter.',
+                'alpha_dash' => 'Username hanya boleh huruf, angka, garis bawah (_), dan tanda hubung (-).',
+                'is_unique'  => 'Username ini sudah dipakai akun lain.',
+            ],
+            'email'    => ['valid_email' => 'Format email tidak valid.'],
+            'password' => ['required' => 'Password wajib diisi.', 'min_length' => 'Password minimal 8 karakter.'],
+        ]);
+
+        if (! $valid) {
+            return redirect()->to(site_url('profil') . '#tim')->withInput()->with('errorsTim', $this->validator->getErrors());
+        }
+
+        // Username juga tidak boleh sama dengan username guru
+        $dipakaiGuru = \Config\Database::connect()->table('guru')->where('username', $input['username'])->countAllResults();
+        if ($dipakaiGuru) {
+            return redirect()->to(site_url('profil') . '#tim')->withInput()
+                ->with('errorsTim', ['Username ini sudah dipakai oleh akun guru.']);
+        }
+
+        // Password di-hash otomatis oleh AdminModel
+        (new AdminModel())->insert([
+            'nama_admin' => $input['nama_admin'],
+            'username'   => $input['username'],
+            'email'      => $input['email'] ?: null,
+            'password'   => $input['password'],
+            'role'       => 'admin_pusat',
+            'id_sekolah' => null,
+            'status'     => 'aktif',
+        ]);
+
+        return redirect()->to(site_url('profil') . '#tim')
+            ->with('sukses', 'Akun Admin Dinas untuk ' . esc($input['nama_admin']) . ' berhasil dibuat.')
+            ->with('akunBaru', [
+                'nama'     => $input['nama_admin'],
+                'username' => $input['username'],
+                'password' => $input['password'],
+                'url'      => site_url('login'),
+            ]);
+    }
+
+    // =====================================================
+    // TIM ADMIN DINAS: aktifkan / nonaktifkan
+    // =====================================================
+    public function statusAdmin($id)
+    {
+        if (! session()->get('logged_in') || session()->get('role') !== 'admin_pusat') {
+            return redirect()->to('dashboard');
+        }
+
+        $kembali = site_url('profil') . '#tim';
+
+        if ((int) $id === (int) session()->get('user_id')) {
+            return redirect()->to($kembali)->with('gagalTim', 'Anda tidak bisa menonaktifkan akun Anda sendiri.');
+        }
+
+        $model = new AdminModel();
+        $akun  = $model->where('id_admin', $id)->where('role', 'admin_pusat')->first();
+        if (! $akun) {
+            return redirect()->to($kembali)->with('gagalTim', 'Akun tidak ditemukan.');
+        }
+
+        $statusBaru = $akun['status'] === 'aktif' ? 'nonaktif' : 'aktif';
+
+        // Pastikan selalu tersisa minimal satu Admin Dinas aktif
+        if ($statusBaru === 'nonaktif') {
+            $aktif = $model->where('role', 'admin_pusat')->where('status', 'aktif')->countAllResults();
+            if ($aktif <= 1) {
+                return redirect()->to($kembali)->with('gagalTim', 'Minimal harus ada satu Admin Dinas yang aktif.');
+            }
+        }
+
+        $model->update($id, ['status' => $statusBaru]);
+
+        return redirect()->to($kembali)->with('sukses', 'Akun ' . esc($akun['nama_admin']) . ' sekarang ' . $statusBaru . '.');
     }
 }

@@ -1,10 +1,10 @@
 <?php
-
 /** @var array $akun */
 /** @var bool $isGuru */
 /** @var string $nama */
 /** @var string $labelRole */
 /** @var array|null $sekolah */
+/** @var array|null $timDinas */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
@@ -143,13 +143,11 @@ $sejak = ! empty($akun['created_at'])
                 </div>
             <?php endif; ?>
 
-            <?php foreach (
-                [
-                    ['password_lama', 'Password Lama', 'current-password'],
-                    ['password_baru', 'Password Baru', 'new-password'],
-                    ['konfirmasi_password', 'Ulangi Password Baru', 'new-password'],
-                ] as [$nm, $label, $auto]
-            ) : ?>
+            <?php foreach ([
+                ['password_lama', 'Password Lama', 'current-password'],
+                ['password_baru', 'Password Baru', 'new-password'],
+                ['konfirmasi_password', 'Ulangi Password Baru', 'new-password'],
+            ] as [$nm, $label, $auto]) : ?>
                 <div>
                     <label class="font-semibold block mb-1 text-slate-700"><?= $label ?></label>
                     <div class="relative">
@@ -169,6 +167,167 @@ $sejak = ! empty($akun['created_at'])
                 </button>
             </div>
         </form>
+
+        <?php if ($timDinas !== null) : ?>
+            <?php
+            $errorsTim = session()->getFlashdata('errorsTim') ?? [];
+            $akunBaru  = session()->getFlashdata('akunBaru');
+            ?>
+            <!-- Tim Admin Dinas (khusus Admin Dinas) -->
+            <div id="tim" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
+                <div class="flex flex-wrap justify-between items-start gap-3">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-users-gear text-indigo-500 mr-2"></i>Tim Admin Dinas</h3>
+                        <p class="text-slate-400 mt-0.5">Tambahkan rekan kerja di Dinas supaya pengelolaan platform tidak bergantung pada satu akun.</p>
+                    </div>
+                    <button type="button" onclick="bukaFormTim()"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center">
+                        <i class="fa-solid fa-user-plus mr-2"></i>Tambah Admin Dinas
+                    </button>
+                </div>
+
+                <?php if (session()->getFlashdata('gagalTim')) : ?>
+                    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
+                        <i class="fa-solid fa-circle-exclamation mr-1"></i><?= session()->getFlashdata('gagalTim') ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($akunBaru) : ?>
+                    <!-- Password akun baru (tampil sekali) -->
+                    <div class="border-2 border-emerald-300 rounded-xl p-4 space-y-3">
+                        <div class="flex flex-wrap justify-between items-start gap-2">
+                            <div>
+                                <p class="font-bold text-slate-800"><i class="fa-solid fa-key text-emerald-600 mr-1"></i>Akun berhasil dibuat</p>
+                                <p class="text-[11px] text-amber-700 mt-0.5"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Password hanya ditampilkan sekali. Salin dan berikan kepada yang bersangkutan.</p>
+                            </div>
+                            <button type="button" onclick="salinAkunTim(this)" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded-lg">
+                                <i class="fa-regular fa-copy mr-1"></i>Salin Info Akun
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="bg-slate-50 rounded-lg p-2.5"><div class="text-[10px] text-slate-400 uppercase">Nama</div><div class="font-semibold"><?= esc($akunBaru['nama']) ?></div></div>
+                            <div class="bg-slate-50 rounded-lg p-2.5"><div class="text-[10px] text-slate-400 uppercase">Username</div><div class="font-mono font-semibold"><?= esc($akunBaru['username']) ?></div></div>
+                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5"><div class="text-[10px] text-emerald-600 uppercase">Password</div><div class="font-mono font-bold text-emerald-800"><?= esc($akunBaru['password']) ?></div></div>
+                        </div>
+                        <textarea id="teksAkunTim" class="hidden"><?= esc(
+                            "Akun EDUVATION - Admin Dinas\n" .
+                            "Nama     : {$akunBaru['nama']}\n" .
+                            "Username : {$akunBaru['username']}\n" .
+                            "Password : {$akunBaru['password']}\n" .
+                            "Login di : {$akunBaru['url']}\n\n" .
+                            "Segera ganti password setelah login pertama melalui menu Profil Saya."
+                        ) ?></textarea>
+                    </div>
+                <?php endif; ?>
+
+                <div class="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                    <?php foreach ($timDinas as $t) : ?>
+                        <?php $saya = (int) $t['id_admin'] === (int) session()->get('user_id'); ?>
+                        <div class="flex items-center gap-3 p-3 <?= $t['status'] === 'nonaktif' ? 'opacity-60' : '' ?>">
+                            <div class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold shrink-0">
+                                <?php $k = preg_split('/\s+/', trim($t['nama_admin'])); ?>
+                                <?= esc(strtoupper(mb_substr($k[0] ?? '', 0, 1) . mb_substr($k[1] ?? '', 0, 1))) ?>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="font-semibold text-slate-800 truncate">
+                                    <?= esc($t['nama_admin']) ?>
+                                    <?php if ($saya) : ?><span class="ml-1 bg-brand-50 text-brand-700 text-[10px] font-bold px-2 py-0.5 rounded-full">Anda</span><?php endif; ?>
+                                </div>
+                                <div class="text-[11px] text-slate-400 truncate">@<?= esc($t['username']) ?><?= $t['email'] ? ' • ' . esc($t['email']) : '' ?></div>
+                            </div>
+                            <?php if ($t['status'] === 'aktif') : ?>
+                                <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full">Aktif</span>
+                            <?php else : ?>
+                                <span class="bg-slate-200 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-full">Nonaktif</span>
+                            <?php endif; ?>
+                            <?php if (! $saya) : ?>
+                                <form action="<?= site_url('profil/tim/status/' . $t['id_admin']) ?>" method="post"
+                                    onsubmit="return confirm('<?= $t['status'] === 'aktif' ? 'Nonaktifkan' : 'Aktifkan' ?> akun <?= esc($t['nama_admin'], 'js') ?>?')">
+                                    <?= csrf_field() ?>
+                                    <button type="submit" title="<?= $t['status'] === 'aktif' ? 'Nonaktifkan' : 'Aktifkan' ?>"
+                                        class="w-8 h-8 rounded-lg border border-slate-200 hover:bg-amber-50 hover:text-amber-600 flex items-center justify-center">
+                                        <i class="fa-solid <?= $t['status'] === 'aktif' ? 'fa-toggle-on' : 'fa-toggle-off' ?>"></i>
+                                    </button>
+                                </form>
+                            <?php else : ?>
+                                <span class="w-8"></span>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <!-- Modal tambah Admin Dinas -->
+            <div id="modalTim" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+                <form action="<?= site_url('profil/tim') ?>" method="post" autocomplete="off"
+                    class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-xs">
+                    <?= csrf_field() ?>
+                    <div class="flex justify-between items-center border-b pb-3">
+                        <h3 class="font-bold text-slate-800 text-base"><i class="fa-solid fa-user-plus text-indigo-500 mr-2"></i>Tambah Admin Dinas</h3>
+                        <button type="button" onclick="closeModal('modalTim')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                    </div>
+
+                    <?php if ($errorsTim) : ?>
+                        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
+                            <ul class="list-disc list-inside"><?php foreach ($errorsTim as $e) : ?><li><?= esc($e) ?></li><?php endforeach; ?></ul>
+                        </div>
+                    <?php endif; ?>
+
+                    <div>
+                        <label class="font-semibold block mb-1 text-slate-700">Nama Lengkap <span class="text-red-500">*</span></label>
+                        <input type="text" name="nama_admin" required value="<?= esc(old('nama_admin')) ?>" class="w-full border border-slate-300 rounded-lg p-2.5">
+                    </div>
+                    <div>
+                        <label class="font-semibold block mb-1 text-slate-700">Username <span class="text-red-500">*</span></label>
+                        <input type="text" name="username" required value="<?= esc(old('username')) ?>" placeholder="contoh: dinas.andi" class="w-full border border-slate-300 rounded-lg p-2.5 font-mono lowercase">
+                    </div>
+                    <div>
+                        <label class="font-semibold block mb-1 text-slate-700">Email</label>
+                        <input type="email" name="email" value="<?= esc(old('email')) ?>" class="w-full border border-slate-300 rounded-lg p-2.5">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="font-semibold text-slate-700">Password <span class="text-red-500">*</span></label>
+                            <button type="button" onclick="buatSandiTim()" class="text-[10px] text-brand-600 font-semibold hover:underline">
+                                <i class="fa-solid fa-wand-magic-sparkles mr-0.5"></i>Buat Otomatis
+                            </button>
+                        </div>
+                        <input type="password" name="password" id="sandiTim" required minlength="8" autocomplete="new-password" class="w-full border border-slate-300 rounded-lg p-2.5 font-mono">
+                        <p class="text-[10px] text-slate-400 mt-1">Minimal 8 karakter.</p>
+                    </div>
+                    <div class="flex justify-end space-x-2 border-t pt-3">
+                        <button type="button" onclick="closeModal('modalTim')" class="px-4 py-2 border rounded-lg font-semibold text-slate-600">Batal</button>
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold"><i class="fa-solid fa-floppy-disk mr-1"></i> Buat Akun</button>
+                    </div>
+                </form>
+            </div>
+
+            <script>
+                function bukaFormTim() {
+                    openModal('modalTim');
+                }
+
+                function buatSandiTim() {
+                    const huruf = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                    const acak = new Uint32Array(10);
+                    crypto.getRandomValues(acak);
+                    const input = document.getElementById('sandiTim');
+                    input.value = Array.from(acak, n => huruf[n % huruf.length]).join('');
+                    input.type = 'text';
+                }
+
+                function salinAkunTim(tombol) {
+                    navigator.clipboard.writeText(document.getElementById('teksAkunTim').value).then(() => {
+                        tombol.innerHTML = '<i class="fa-solid fa-check mr-1"></i>Tersalin!';
+                        setTimeout(() => tombol.innerHTML = '<i class="fa-regular fa-copy mr-1"></i>Salin Info Akun', 2000);
+                    });
+                }
+
+                <?php if ($errorsTim) : ?>
+                    document.addEventListener('DOMContentLoaded', () => openModal('modalTim'));
+                <?php endif; ?>
+            </script>
+        <?php endif; ?>
     </div>
 </section>
 
