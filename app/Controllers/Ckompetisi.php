@@ -164,12 +164,28 @@ class Ckompetisi extends BaseController
     {
         $db = \Config\Database::connect();
 
-        $kompetisi = $db->table('kompetisi k')
+        // Tab: "aktif" (belum selesai) atau "selesai"
+        $tab       = $this->request->getGet('tab') === 'selesai' ? 'selesai' : 'aktif';
+        $statusTab = [
+            'aktif'   => ['draft', 'pendaftaran', 'berlangsung'],
+            'selesai' => ['selesai'],
+        ];
+
+        $builder = $db->table('kompetisi k')
             ->select('k.*, a.nama_admin AS pembuat')
             ->select('(SELECT COUNT(*) FROM kompetisi_peserta p WHERE p.id_kompetisi = k.id_kompetisi) AS jumlah_peserta', false)
             ->join('admin a', 'a.id_admin = k.id_admin_pembuat', 'left')
-            ->orderBy('k.tanggal_mulai', 'DESC')
-            ->get()->getResultArray();
+            ->whereIn('k.status', $statusTab[$tab]);
+
+        // Belum selesai: tenggat terdekat di atas. Selesai: yang terbaru selesai di atas.
+        $kompetisi = $tab === 'aktif'
+            ? $builder->orderBy('k.tanggal_selesai', 'ASC')->get()->getResultArray()
+            : $builder->orderBy('k.tanggal_selesai', 'DESC')->get()->getResultArray();
+
+        $jumlahTab = [];
+        foreach ($statusTab as $kunci => $daftarStatus) {
+            $jumlahTab[$kunci] = $db->table('kompetisi')->whereIn('status', $daftarStatus)->countAllResults();
+        }
 
         // Ambil kategori & kriteria semua kompetisi sekaligus
         $ids      = array_column($kompetisi, 'id_kompetisi');
@@ -198,6 +214,8 @@ class Ckompetisi extends BaseController
         unset($k);
 
         return view('admin/dinas/kompetisi', [
+            'tab'            => $tab,
+            'jumlahTab'      => $jumlahTab,
             'kompetisi'      => $kompetisi,
             'label'          => self::STATUS,
             'kategoriBawaan' => self::KATEGORI_BAWAAN,

@@ -160,6 +160,7 @@ $keterangan = function ($k) use ($tgl) {
                     <div id="p_prestasi" class="text-[11px] font-bold uppercase tracking-wider"></div>
                     <h3 id="p_judul" class="font-bold text-slate-800 text-base leading-snug"></h3>
                     <p id="p_sub" class="text-slate-400 mt-0.5"></p>
+                    <span id="p_kategori" class="hidden mt-1.5 inline-block bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1 rounded-full"></span>
                 </div>
             </div>
             <button type="button" onclick="closeModal('modalPeserta')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -208,6 +209,7 @@ $keterangan = function ($k) use ($tgl) {
 
     let pesertaAktif = [];
     let diumumkan = false;
+    let kategoriTunggal = false; // true kalau semua karya sekolah ada di satu kategori
 
     function lihatPeserta(k) {
         pesertaAktif = k.peserta || [];
@@ -236,6 +238,17 @@ $keterangan = function ($k) use ($tgl) {
 
         // Filter kategori hanya kalau karya sekolah ada di lebih dari satu kategori
         const kategoriSekolah = [...new Set(pesertaAktif.map(p => p.nama_kategori).filter(Boolean))];
+
+        // Kalau kategorinya sama semua, cukup tampil sekali di header
+        kategoriTunggal = kategoriSekolah.length === 1;
+        const chip = document.getElementById('p_kategori');
+        chip.classList.toggle('hidden', !kategoriTunggal);
+        chip.innerHTML = '';
+        if (kategoriTunggal) {
+            const ikonTag = document.createElement('i');
+            ikonTag.className = 'fa-solid fa-tag mr-1';
+            chip.append(ikonTag, document.createTextNode(kategoriSekolah[0]));
+        }
         const filter = document.getElementById('p_filter');
         filter.innerHTML = '';
         filter.classList.toggle('hidden', kategoriSekolah.length <= 1);
@@ -277,63 +290,89 @@ $keterangan = function ($k) use ($tgl) {
             if (teks !== undefined) el.textContent = teks;
             return el;
         };
+        const formatNilai = n => parseFloat(n).toFixed(2).replace('.', ',');
 
-        daftar.forEach(p => {
-            const juara = diumumkan && WARNA_JUARA[p.peringkat];
-            const warna = juara || WARNA_BIASA;
+        const juara = daftar.filter(p => diumumkan && WARNA_JUARA[p.peringkat]);
+        const lainnya = daftar.filter(p => !(diumumkan && WARNA_JUARA[p.peringkat]));
 
+        // ---------- Kartu besar untuk juara ----------
+        juara.forEach(p => {
+            const warna = WARNA_JUARA[p.peringkat];
             const kartu = buat('div', 'border border-slate-200 rounded-2xl overflow-hidden shadow-sm');
 
-            // Pita atas: medali + kategori
             const pita = buat('div', 'px-4 py-2.5 flex flex-wrap justify-between items-center gap-2 ' + warna.pita);
             const status = buat('div', 'font-bold flex items-center gap-2');
-            const ikon = buat('i', 'fa-solid ' + (juara ? 'fa-medal' : (diumumkan ? 'fa-flag-checkered' : 'fa-hourglass-half')));
-            status.append(ikon, document.createTextNode(juara ? 'Juara ' + p.peringkat : (diumumkan ? 'Peserta' : 'Menunggu pengumuman')));
-            pita.append(status, buat('span', 'text-[11px] font-semibold opacity-80', p.nama_kategori || ''));
+            status.append(buat('i', 'fa-solid fa-medal'), document.createTextNode('Juara ' + p.peringkat));
+            pita.appendChild(status);
+            if (!kategoriTunggal) pita.appendChild(buat('span', 'text-[11px] font-semibold opacity-80', p.nama_kategori || ''));
 
-            // Isi: peserta & karya
             const isi = buat('div', 'grid grid-cols-1 md:grid-cols-2 gap-4 p-4');
+            [
+                ['fa-user', 'bg-brand-50 text-brand-600', 'Peserta', p.nama_guru, p.mapel],
+                ['fa-lightbulb', 'bg-indigo-50 text-indigo-600', 'Karya', p.judul_karya, '']
+            ].forEach(([ikon, warnaIkon, label, utama, kecil]) => {
+                const kolom = buat('div', 'flex gap-3');
+                const bulat = buat('div', 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 ' + warnaIkon);
+                bulat.appendChild(buat('i', 'fa-solid ' + ikon));
+                const info = buat('div', 'min-w-0');
+                info.append(
+                    buat('div', 'text-[10px] text-slate-400 uppercase font-bold tracking-wider', label),
+                    buat('div', 'font-bold text-slate-800 text-sm leading-snug', utama || '-')
+                );
+                if (kecil) info.appendChild(buat('div', 'text-[11px] text-slate-400', kecil));
+                kolom.append(bulat, info);
+                isi.appendChild(kolom);
+            });
 
-            const kolomPeserta = buat('div', 'flex gap-3');
-            kolomPeserta.append(buat('div', 'w-9 h-9 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center shrink-0'));
-            kolomPeserta.firstChild.appendChild(buat('i', 'fa-solid fa-user'));
-            const infoPeserta = buat('div', 'min-w-0');
-            infoPeserta.append(
-                buat('div', 'text-[10px] text-slate-400 uppercase font-bold tracking-wider', 'Peserta'),
-                buat('div', 'font-bold text-slate-800 text-sm', p.nama_guru || '-'),
-                buat('div', 'text-[11px] text-slate-400', p.mapel || '')
-            );
-            kolomPeserta.appendChild(infoPeserta);
-
-            const kolomKarya = buat('div', 'flex gap-3');
-            kolomKarya.append(buat('div', 'w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0'));
-            kolomKarya.firstChild.appendChild(buat('i', 'fa-solid fa-lightbulb'));
-            const infoKarya = buat('div', 'min-w-0');
-            infoKarya.append(
-                buat('div', 'text-[10px] text-slate-400 uppercase font-bold tracking-wider', 'Karya'),
-                buat('div', 'font-bold text-slate-800 text-sm leading-snug', p.judul_karya || '-')
-            );
-            kolomKarya.appendChild(infoKarya);
-
-            isi.append(kolomPeserta, kolomKarya);
-
-            // Bawah: total nilai
             const bawah = buat('div', 'border-t bg-slate-50 px-4 py-3 flex justify-between items-center');
             bawah.appendChild(buat('span', 'text-slate-500 font-semibold', 'Total Nilai'));
-            if (diumumkan && p.nilai) {
-                const nilai = buat('div', 'text-right');
-                nilai.append(
-                    buat('span', 'text-2xl font-extrabold ' + (juara ? warna.teks : 'text-slate-800'), parseFloat(p.nilai).toFixed(2).replace('.', ',')),
-                    buat('span', 'text-slate-400 font-semibold ml-1', '/ 100')
-                );
-                bawah.appendChild(nilai);
-            } else {
-                bawah.appendChild(buat('span', 'text-slate-400 italic', 'Tampil setelah diumumkan'));
-            }
+            const nilai = buat('div', 'text-right');
+            nilai.append(
+                buat('span', 'text-2xl font-extrabold ' + warna.teks, formatNilai(p.nilai)),
+                buat('span', 'text-slate-400 font-semibold ml-1', '/ 100')
+            );
+            bawah.appendChild(nilai);
 
             kartu.append(pita, isi, bawah);
             wadah.appendChild(kartu);
         });
+
+        // ---------- Baris ringkas untuk peserta lainnya ----------
+        if (lainnya.length) {
+            if (juara.length) {
+                wadah.appendChild(buat('div', 'text-[11px] font-bold text-slate-500 uppercase tracking-wider pt-2',
+                    'Peserta lainnya (' + lainnya.length + ')'));
+            }
+
+            const daftarRingkas = buat('div', 'border border-slate-200 rounded-2xl divide-y divide-slate-100 overflow-hidden');
+            lainnya.forEach((p, i) => {
+                const baris = buat('div', 'flex items-center gap-3 px-4 py-3 hover:bg-slate-50');
+
+                baris.appendChild(buat('span', 'w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold flex items-center justify-center shrink-0',
+                    String(juara.length + i + 1)));
+
+                const info = buat('div', 'flex-1 min-w-0');
+                info.appendChild(buat('div', 'font-semibold text-slate-800 truncate', p.judul_karya || '-'));
+                const sub = buat('div', 'text-[11px] text-slate-400 truncate');
+                sub.textContent = (p.nama_guru || '-') + (p.mapel ? ' • ' + p.mapel : '') + (!kategoriTunggal && p.nama_kategori ? ' • ' + p.nama_kategori : '');
+                info.appendChild(sub);
+                baris.appendChild(info);
+
+                if (diumumkan && p.nilai) {
+                    const nilai = buat('div', 'text-right shrink-0');
+                    nilai.append(
+                        buat('span', 'text-base font-bold text-slate-800', formatNilai(p.nilai)),
+                        buat('span', 'text-[10px] text-slate-400 ml-0.5', '/100')
+                    );
+                    baris.appendChild(nilai);
+                } else {
+                    baris.appendChild(buat('span', 'text-[11px] text-slate-400 italic shrink-0', diumumkan ? '-' : 'Menunggu'));
+                }
+
+                daftarRingkas.appendChild(baris);
+            });
+            wadah.appendChild(daftarRingkas);
+        }
     }
 </script>
 <?= $this->endSection() ?>

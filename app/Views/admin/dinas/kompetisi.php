@@ -4,6 +4,8 @@
 /** @var array $label */
 /** @var array $kategoriBawaan */
 /** @var array $kriteriaBawaan */
+/** @var string $tab */
+/** @var array $jumlahTab */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
@@ -55,6 +57,18 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
         </div>
     <?php endif; ?>
 
+    <!-- Tab -->
+    <div class="flex flex-wrap gap-2 text-xs font-semibold">
+        <?php foreach (['aktif' => ['Belum Selesai', 'fa-bolt'], 'selesai' => ['Selesai', 'fa-flag-checkered']] as $kunci => [$teks, $ikonTab]) : ?>
+            <a href="<?= site_url('kompetisi') . ($kunci === 'selesai' ? '?tab=selesai' : '') ?>"
+                class="px-4 py-2 rounded-xl border flex items-center gap-2 transition
+                       <?= $tab === $kunci ? 'bg-brand-600 border-brand-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50' ?>">
+                <i class="fa-solid <?= $ikonTab ?>"></i><?= $teks ?>
+                <span class="<?= $tab === $kunci ? 'bg-white/25' : 'bg-slate-100' ?> text-[10px] px-1.5 rounded-full"><?= $jumlahTab[$kunci] ?></span>
+            </a>
+        <?php endforeach; ?>
+    </div>
+
     <?php if (empty($kompetisi)) : ?>
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center py-12 px-4">
             <div class="relative w-16 h-16 mb-4">
@@ -63,8 +77,13 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
                     <i class="fa-solid fa-trophy text-2xl text-amber-500"></i>
                 </div>
             </div>
-            <p class="text-sm font-semibold text-slate-700">Belum ada kompetisi</p>
-            <p class="text-xs text-slate-400 mt-1 max-w-[280px] leading-relaxed">Buat kompetisi pertama dengan tombol "Buat Kompetisi" di atas.</p>
+            <?php if ($tab === 'aktif') : ?>
+                <p class="text-sm font-semibold text-slate-700">Tidak ada kompetisi yang sedang berjalan</p>
+                <p class="text-xs text-slate-400 mt-1 max-w-[280px] leading-relaxed">Buat kompetisi baru dengan tombol "Buat Kompetisi" di atas. Kompetisi yang sudah selesai ada di tab Selesai.</p>
+            <?php else : ?>
+                <p class="text-sm font-semibold text-slate-700">Belum ada kompetisi yang selesai</p>
+                <p class="text-xs text-slate-400 mt-1 max-w-[280px] leading-relaxed">Kompetisi yang sudah melewati tahap penjurian akan tersimpan di sini.</p>
+            <?php endif; ?>
         </div>
     <?php else : ?>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
