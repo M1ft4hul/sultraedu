@@ -1,5 +1,5 @@
 <?php
-
+// ini latihan saya
 /** @var array $akun */
 /** @var bool $isGuru */
 /** @var string $nama */
