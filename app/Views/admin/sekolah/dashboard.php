@@ -18,7 +18,7 @@ $kartu = [
     ['Guru Aktif',            $stat['guru'],          'fa-chalkboard-user', 'bg-blue-50 text-blue-600'],
     ['Menunggu Verifikasi',   $stat['tungguSekolah'], 'fa-hourglass-half',  'bg-amber-50 text-amber-600'],
     ['Praktik Baik Tervalidasi', $stat['praktik'],    'fa-book-open',       'bg-emerald-50 text-emerald-600'],
-    ['Inovasi di Bank Inovasi', $stat['inovasi'],     'fa-lightbulb',       'bg-indigo-50 text-indigo-600'],
+    ['Bank Inovasi', $stat['inovasi'],     'fa-lightbulb',       'bg-indigo-50 text-indigo-600'],
     ['Juara Kompetisi',       $stat['juara'],         'fa-award',           'bg-orange-50 text-orange-600'],
 ];
 ?>
