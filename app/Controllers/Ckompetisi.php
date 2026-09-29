@@ -105,8 +105,9 @@ class Ckompetisi extends BaseController
             // Peserta (yang ditolak Dinas tidak ditampilkan)
             $rows = $db->table('kompetisi_peserta p')
                 ->select('p.id_kompetisi, p.id_sekolah, p.judul_karya, p.peringkat, p.nilai, p.status_validasi,
-                          s.nama_sekolah, s.kabupaten_kota, k.nama_kategori, k.urutan')
+                          s.nama_sekolah, k.nama_kategori, k.urutan, g.nama_guru, g.mapel')
                 ->join('sekolah s', 's.id_sekolah = p.id_sekolah', 'left')
+                ->join('guru g', 'g.id_guru = p.id_guru', 'left')
                 ->join('kompetisi_kategori k', 'k.id_kategori = p.id_kategori', 'left')
                 ->whereIn('p.id_kompetisi', $ids)
                 ->where('p.status_validasi !=', 'ditolak')
@@ -125,26 +126,26 @@ class Ckompetisi extends BaseController
         }
 
         foreach ($kompetisi as &$k) {
-            $daftar = $peserta[$k['id_kompetisi']] ?? [];
+            $semua = $peserta[$k['id_kompetisi']] ?? [];
 
-            // Nilai & peringkat disembunyikan sebelum hasil diumumkan
-            if (! $k['hasil_diumumkan']) {
-                foreach ($daftar as &$d) {
+            // Hanya karya sekolah sendiri yang dikirim ke halaman
+            $milikSendiri = array_values(array_filter($semua, fn($d) => (int) $d['id_sekolah'] === $idSekolah));
+
+            foreach ($milikSendiri as &$d) {
+                unset($d['id_sekolah'], $d['nama_sekolah']);
+                // Nilai & peringkat disembunyikan sebelum hasil diumumkan
+                if (! $k['hasil_diumumkan']) {
                     $d['peringkat'] = null;
                     $d['nilai']     = null;
                 }
-                unset($d);
-            }
-            foreach ($daftar as &$d) {
-                $d['milik_sendiri'] = (int) $d['id_sekolah'] === $idSekolah;
-                unset($d['id_sekolah']);
             }
             unset($d);
 
-            $k['peserta']        = $daftar;
+            $k['peserta']        = $milikSendiri;
             $k['kategori']       = $kategori[$k['id_kompetisi']] ?? [];
-            $k['jumlah_sekolah'] = count(array_unique(array_column($daftar, 'nama_sekolah')));
-            $k['karya_sendiri']  = count(array_filter($daftar, fn($d) => $d['milik_sendiri']));
+            $k['total_karya']    = count($semua);
+            $k['jumlah_sekolah'] = count(array_unique(array_column($semua, 'id_sekolah')));
+            $k['karya_sendiri']  = count($milikSendiri);
         }
         unset($k);
 

@@ -14,6 +14,24 @@ class Cprofil extends BaseController
         'guru'          => 'Guru',
     ];
 
+    // Role yang boleh menambah rekan setim
+    private function bolehKelolaTim(): bool
+    {
+        return session()->get('logged_in')
+            && in_array(session()->get('role'), ['admin_pusat', 'admin_sekolah'], true);
+    }
+
+    // Query akun setim: role sama, dan untuk Admin Sekolah juga sekolah yang sama
+    private function queryTim()
+    {
+        $model = (new AdminModel())->where('role', session()->get('role'));
+        if (session()->get('role') === 'admin_sekolah') {
+            $model->where('id_sekolah', session()->get('id_sekolah'));
+        }
+
+        return $model;
+    }
+
     private function isGuru(): bool
     {
         return session()->get('user_type') === 'guru';
@@ -54,18 +72,18 @@ class Cprofil extends BaseController
 
         unset($akun['password']); // hash password tidak dikirim ke halaman
 
-        // Khusus Admin Dinas: daftar tim Admin Dinas
+        // Admin Dinas & Admin Sekolah: daftar rekan setim
         $timDinas = null;
-        if (session()->get('role') === 'admin_pusat') {
-            $timDinas = (new AdminModel())
+        if ($this->bolehKelolaTim()) {
+            $timDinas = $this->queryTim()
                 ->select('id_admin, nama_admin, username, email, status, created_at')
-                ->where('role', 'admin_pusat')
                 ->orderBy('created_at', 'ASC')
                 ->findAll();
         }
 
         return view('admin/profil', [
             'timDinas'  => $timDinas,
+            'labelTim'  => session()->get('role') === 'admin_sekolah' ? 'Admin Sekolah' : 'Admin Dinas',
             'akun'      => $akun,
             'isGuru'    => $this->isGuru(),
             'nama'      => $this->isGuru() ? $akun['nama_guru'] : $akun['nama_admin'],
@@ -177,7 +195,7 @@ class Cprofil extends BaseController
     // =====================================================
     public function tambahAdmin()
     {
-        if (! session()->get('logged_in') || session()->get('role') !== 'admin_pusat') {
+        if (! $this->bolehKelolaTim()) {
             return redirect()->to('dashboard');
         }
 
@@ -217,18 +235,23 @@ class Cprofil extends BaseController
         }
 
         // Password di-hash otomatis oleh AdminModel
+        // Akun baru ikut role & sekolah pembuatnya
+        $role    = session()->get('role');
+        $sekolah = $role === 'admin_sekolah' ? session()->get('id_sekolah') : null;
+        $label   = $role === 'admin_sekolah' ? 'Admin Sekolah' : 'Admin Dinas';
+
         (new AdminModel())->insert([
             'nama_admin' => $input['nama_admin'],
             'username'   => $input['username'],
             'email'      => $input['email'] ?: null,
             'password'   => $input['password'],
-            'role'       => 'admin_pusat',
-            'id_sekolah' => null,
+            'role'       => $role,
+            'id_sekolah' => $sekolah,
             'status'     => 'aktif',
         ]);
 
         return redirect()->to(site_url('profil') . '#tim')
-            ->with('sukses', 'Akun Admin Dinas untuk ' . esc($input['nama_admin']) . ' berhasil dibuat.')
+            ->with('sukses', 'Akun ' . $label . ' untuk ' . esc($input['nama_admin']) . ' berhasil dibuat.')
             ->with('akunBaru', [
                 'nama'     => $input['nama_admin'],
                 'username' => $input['username'],
@@ -242,7 +265,7 @@ class Cprofil extends BaseController
     // =====================================================
     public function statusAdmin($id)
     {
-        if (! session()->get('logged_in') || session()->get('role') !== 'admin_pusat') {
+        if (! $this->bolehKelolaTim()) {
             return redirect()->to('dashboard');
         }
 
@@ -252,23 +275,25 @@ class Cprofil extends BaseController
             return redirect()->to($kembali)->with('gagalTim', 'Anda tidak bisa menonaktifkan akun Anda sendiri.');
         }
 
-        $model = new AdminModel();
-        $akun  = $model->where('id_admin', $id)->where('role', 'admin_pusat')->first();
+        // Hanya akun setim (role sama, dan sekolah sama untuk Admin Sekolah)
+        $akun = $this->queryTim()->where('id_admin', $id)->first();
         if (! $akun) {
             return redirect()->to($kembali)->with('gagalTim', 'Akun tidak ditemukan.');
         }
 
         $statusBaru = $akun['status'] === 'aktif' ? 'nonaktif' : 'aktif';
 
-        // Pastikan selalu tersisa minimal satu Admin Dinas aktif
+        // Pastikan selalu tersisa minimal satu akun aktif di tim
         if ($statusBaru === 'nonaktif') {
-            $aktif = $model->where('role', 'admin_pusat')->where('status', 'aktif')->countAllResults();
+            $aktif = $this->queryTim()->where('status', 'aktif')->countAllResults();
             if ($aktif <= 1) {
-                return redirect()->to($kembali)->with('gagalTim', 'Minimal harus ada satu Admin Dinas yang aktif.');
+                $label = session()->get('role') === 'admin_sekolah' ? 'Admin Sekolah di sekolah ini' : 'Admin Dinas';
+
+                return redirect()->to($kembali)->with('gagalTim', 'Minimal harus ada satu ' . $label . ' yang aktif.');
             }
         }
 
-        $model->update($id, ['status' => $statusBaru]);
+        (new AdminModel())->update($id, ['status' => $statusBaru]);
 
         return redirect()->to($kembali)->with('sukses', 'Akun ' . esc($akun['nama_admin']) . ' sekarang ' . $statusBaru . '.');
     }

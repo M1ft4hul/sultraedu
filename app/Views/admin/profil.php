@@ -1,10 +1,12 @@
 <?php
+
 /** @var array $akun */
 /** @var bool $isGuru */
 /** @var string $nama */
 /** @var string $labelRole */
 /** @var array|null $sekolah */
 /** @var array|null $timDinas */
+/** @var string $labelTim */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
@@ -143,11 +145,13 @@ $sejak = ! empty($akun['created_at'])
                 </div>
             <?php endif; ?>
 
-            <?php foreach ([
-                ['password_lama', 'Password Lama', 'current-password'],
-                ['password_baru', 'Password Baru', 'new-password'],
-                ['konfirmasi_password', 'Ulangi Password Baru', 'new-password'],
-            ] as [$nm, $label, $auto]) : ?>
+            <?php foreach (
+                [
+                    ['password_lama', 'Password Lama', 'current-password'],
+                    ['password_baru', 'Password Baru', 'new-password'],
+                    ['konfirmasi_password', 'Ulangi Password Baru', 'new-password'],
+                ] as [$nm, $label, $auto]
+            ) : ?>
                 <div>
                     <label class="font-semibold block mb-1 text-slate-700"><?= $label ?></label>
                     <div class="relative">
@@ -177,12 +181,12 @@ $sejak = ! empty($akun['created_at'])
             <div id="tim" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs">
                 <div class="flex flex-wrap justify-between items-start gap-3">
                     <div>
-                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-users-gear text-indigo-500 mr-2"></i>Tim Admin Dinas</h3>
-                        <p class="text-slate-400 mt-0.5">Tambahkan rekan kerja di Dinas supaya pengelolaan platform tidak bergantung pada satu akun.</p>
+                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-users-gear text-indigo-500 mr-2"></i>Tim <?= $labelTim ?></h3>
+                        <p class="text-slate-400 mt-0.5"><?= $labelTim === 'Admin Sekolah' ? 'Tambahkan rekan di sekolah Anda, misalnya kepala sekolah, supaya pengelolaan tidak bergantung pada satu akun.' : 'Tambahkan rekan kerja di Dinas supaya pengelolaan platform tidak bergantung pada satu akun.' ?></p>
                     </div>
                     <button type="button" onclick="bukaFormTim()"
                         class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center">
-                        <i class="fa-solid fa-user-plus mr-2"></i>Tambah Admin Dinas
+                        <i class="fa-solid fa-user-plus mr-2"></i>Tambah <?= $labelTim ?>
                     </button>
                 </div>
 
@@ -205,18 +209,27 @@ $sejak = ! empty($akun['created_at'])
                             </button>
                         </div>
                         <div class="grid grid-cols-3 gap-2">
-                            <div class="bg-slate-50 rounded-lg p-2.5"><div class="text-[10px] text-slate-400 uppercase">Nama</div><div class="font-semibold"><?= esc($akunBaru['nama']) ?></div></div>
-                            <div class="bg-slate-50 rounded-lg p-2.5"><div class="text-[10px] text-slate-400 uppercase">Username</div><div class="font-mono font-semibold"><?= esc($akunBaru['username']) ?></div></div>
-                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5"><div class="text-[10px] text-emerald-600 uppercase">Password</div><div class="font-mono font-bold text-emerald-800"><?= esc($akunBaru['password']) ?></div></div>
+                            <div class="bg-slate-50 rounded-lg p-2.5">
+                                <div class="text-[10px] text-slate-400 uppercase">Nama</div>
+                                <div class="font-semibold"><?= esc($akunBaru['nama']) ?></div>
+                            </div>
+                            <div class="bg-slate-50 rounded-lg p-2.5">
+                                <div class="text-[10px] text-slate-400 uppercase">Username</div>
+                                <div class="font-mono font-semibold"><?= esc($akunBaru['username']) ?></div>
+                            </div>
+                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
+                                <div class="text-[10px] text-emerald-600 uppercase">Password</div>
+                                <div class="font-mono font-bold text-emerald-800"><?= esc($akunBaru['password']) ?></div>
+                            </div>
                         </div>
                         <textarea id="teksAkunTim" class="hidden"><?= esc(
-                            "Akun EDUVATION - Admin Dinas\n" .
-                            "Nama     : {$akunBaru['nama']}\n" .
-                            "Username : {$akunBaru['username']}\n" .
-                            "Password : {$akunBaru['password']}\n" .
-                            "Login di : {$akunBaru['url']}\n\n" .
-                            "Segera ganti password setelah login pertama melalui menu Profil Saya."
-                        ) ?></textarea>
+                                                                        "Akun EDUVATION - {$labelTim}\n" .
+                                                                            "Nama     : {$akunBaru['nama']}\n" .
+                                                                            "Username : {$akunBaru['username']}\n" .
+                                                                            "Password : {$akunBaru['password']}\n" .
+                                                                            "Login di : {$akunBaru['url']}\n\n" .
+                                                                            "Segera ganti password setelah login pertama melalui menu Profil Saya."
+                                                                    ) ?></textarea>
                     </div>
                 <?php endif; ?>
 
@@ -263,7 +276,7 @@ $sejak = ! empty($akun['created_at'])
                     class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-xs">
                     <?= csrf_field() ?>
                     <div class="flex justify-between items-center border-b pb-3">
-                        <h3 class="font-bold text-slate-800 text-base"><i class="fa-solid fa-user-plus text-indigo-500 mr-2"></i>Tambah Admin Dinas</h3>
+                        <h3 class="font-bold text-slate-800 text-base"><i class="fa-solid fa-user-plus text-indigo-500 mr-2"></i>Tambah <?= $labelTim ?></h3>
                         <button type="button" onclick="closeModal('modalTim')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
                     </div>
 
@@ -279,7 +292,7 @@ $sejak = ! empty($akun['created_at'])
                     </div>
                     <div>
                         <label class="font-semibold block mb-1 text-slate-700">Username <span class="text-red-500">*</span></label>
-                        <input type="text" name="username" required value="<?= esc(old('username')) ?>" placeholder="contoh: dinas.andi" class="w-full border border-slate-300 rounded-lg p-2.5 font-mono lowercase">
+                        <input type="text" name="username" required value="<?= esc(old('username')) ?>" placeholder="<?= $labelTim === 'Admin Sekolah' ? 'contoh: kepsek_smkn4kdi' : 'contoh: dinas_andi' ?>" class="w-full border border-slate-300 rounded-lg p-2.5 font-mono lowercase">
                     </div>
                     <div>
                         <label class="font-semibold block mb-1 text-slate-700">Email</label>

@@ -118,8 +118,8 @@ $keterangan = function ($k) use ($tgl) {
                     <!-- Ringkasan -->
                     <div class="grid grid-cols-3 gap-2 text-center">
                         <div class="bg-slate-50 rounded-lg p-2.5">
-                            <div class="text-lg font-bold text-slate-800"><?= count($k['peserta']) ?></div>
-                            <div class="text-[10px] text-slate-500">Karya</div>
+                            <div class="text-lg font-bold text-slate-800"><?= $k['total_karya'] ?></div>
+                            <div class="text-[10px] text-slate-500">Total Karya</div>
                         </div>
                         <div class="bg-slate-50 rounded-lg p-2.5">
                             <div class="text-lg font-bold text-slate-800"><?= $k['jumlah_sekolah'] ?></div>
@@ -135,7 +135,7 @@ $keterangan = function ($k) use ($tgl) {
                         <button type="button" data-kompetisi="<?= esc(json_encode($k), 'attr') ?>"
                             onclick="lihatPeserta(JSON.parse(this.dataset.kompetisi))"
                             class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center">
-                            <i class="fa-solid fa-users mr-2"></i>Lihat Peserta
+                            <i class="fa-solid fa-users mr-2"></i>Peserta Sekolah Anda
                         </button>
                     </div>
                 </div>
@@ -145,14 +145,22 @@ $keterangan = function ($k) use ($tgl) {
 </section>
 
 <!-- =====================================================
-     MODAL DAFTAR PESERTA
+     MODAL PESERTA SEKOLAH
      ===================================================== -->
 <div id="modalPeserta" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl max-h-[90vh] flex flex-col text-xs">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl max-h-[90vh] flex flex-col text-xs">
+
+        <!-- Header dengan piala -->
         <div class="flex justify-between items-start gap-4 border-b p-5">
-            <div>
-                <h3 id="p_judul" class="font-bold text-slate-800 text-base"></h3>
-                <p id="p_sub" class="text-slate-400 mt-0.5"></p>
+            <div class="flex items-center gap-4">
+                <div id="p_piala" class="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-trophy text-2xl"></i>
+                </div>
+                <div>
+                    <div id="p_prestasi" class="text-[11px] font-bold uppercase tracking-wider"></div>
+                    <h3 id="p_judul" class="font-bold text-slate-800 text-base leading-snug"></h3>
+                    <p id="p_sub" class="text-slate-400 mt-0.5"></p>
+                </div>
             </div>
             <button type="button" onclick="closeModal('modalPeserta')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
         </div>
@@ -161,20 +169,9 @@ $keterangan = function ($k) use ($tgl) {
 
         <div class="overflow-y-auto p-5">
             <div id="p_kosong" class="hidden text-center py-8 text-slate-400">
-                <i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>Belum ada peserta pada kompetisi ini.
+                <i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>Sekolah Anda belum mengikutkan karya pada kompetisi ini.
             </div>
-            <table id="p_tabel" class="w-full text-left text-slate-600">
-                <thead class="text-[10px] uppercase text-slate-500 border-b">
-                    <tr>
-                        <th class="py-2 pr-3 w-16">#</th>
-                        <th class="py-2 pr-3">Karya</th>
-                        <th class="py-2 pr-3">Sekolah</th>
-                        <th class="py-2 pr-3">Kategori</th>
-                        <th id="p_kolomNilai" class="py-2 text-right">Nilai</th>
-                    </tr>
-                </thead>
-                <tbody id="p_isi" class="divide-y divide-slate-100"></tbody>
-            </table>
+            <div id="p_kartu" class="space-y-4"></div>
         </div>
 
         <div class="flex justify-between items-center border-t p-4 bg-slate-50 rounded-b-2xl">
@@ -185,6 +182,30 @@ $keterangan = function ($k) use ($tgl) {
 </div>
 
 <script>
+    // Warna per peringkat: [latar piala, warna ikon, pita kartu, teks]
+    const WARNA_JUARA = {
+        1: {
+            piala: 'bg-gradient-to-br from-amber-300 to-yellow-500 text-white shadow-lg shadow-amber-200',
+            pita: 'bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-950',
+            teks: 'text-amber-600'
+        },
+        2: {
+            piala: 'bg-gradient-to-br from-slate-300 to-slate-500 text-white shadow-lg shadow-slate-200',
+            pita: 'bg-gradient-to-r from-slate-300 to-slate-400 text-slate-900',
+            teks: 'text-slate-500'
+        },
+        3: {
+            piala: 'bg-gradient-to-br from-orange-300 to-orange-600 text-white shadow-lg shadow-orange-200',
+            pita: 'bg-gradient-to-r from-orange-300 to-orange-400 text-orange-950',
+            teks: 'text-orange-600'
+        },
+    };
+    const WARNA_BIASA = {
+        piala: 'bg-slate-100 text-slate-400',
+        pita: 'bg-slate-100 text-slate-600',
+        teks: 'text-slate-400'
+    };
+
     let pesertaAktif = [];
     let diumumkan = false;
 
@@ -192,25 +213,43 @@ $keterangan = function ($k) use ($tgl) {
         pesertaAktif = k.peserta || [];
         diumumkan = !!parseInt(k.hasil_diumumkan);
 
+        // Prestasi terbaik sekolah menentukan warna piala di header
+        const terbaik = diumumkan ?
+            Math.min(...pesertaAktif.map(p => parseInt(p.peringkat) || 99), 99) :
+            99;
+        const warna = WARNA_JUARA[terbaik] || WARNA_BIASA;
+
+        document.getElementById('p_piala').className = 'w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ' + warna.piala;
+        const prestasi = document.getElementById('p_prestasi');
+        prestasi.className = 'text-[11px] font-bold uppercase tracking-wider ' + warna.teks;
+        prestasi.textContent = WARNA_JUARA[terbaik] ?
+            'Sekolah Anda meraih Juara ' + terbaik :
+            (diumumkan ? 'Hasil sudah diumumkan' : 'Menunggu pengumuman');
+
         document.getElementById('p_judul').textContent = k.nama_kompetisi;
-        document.getElementById('p_sub').textContent = pesertaAktif.length + ' karya dari ' + k.jumlah_sekolah + ' sekolah';
-        document.getElementById('p_kolomNilai').classList.toggle('hidden', !diumumkan);
+        document.getElementById('p_sub').textContent = pesertaAktif.length ?
+            pesertaAktif.length + ' karya dari sekolah Anda • total ' + k.total_karya + ' karya dari ' + k.jumlah_sekolah + ' sekolah' :
+            'Total ' + k.total_karya + ' karya dari ' + k.jumlah_sekolah + ' sekolah';
         document.getElementById('p_catatan').textContent = diumumkan ?
-            'Nilai adalah rata-rata dari seluruh juri.' :
+            'Total nilai adalah rata-rata dari seluruh juri.' :
             'Peringkat dan nilai akan tampil setelah hasil diumumkan Dinas.';
 
-        // Filter kategori
+        // Filter kategori hanya kalau karya sekolah ada di lebih dari satu kategori
+        const kategoriSekolah = [...new Set(pesertaAktif.map(p => p.nama_kategori).filter(Boolean))];
         const filter = document.getElementById('p_filter');
         filter.innerHTML = '';
-        ['Semua kategori', ...(k.kategori || [])].forEach((nama, i) => {
-            const tombol = document.createElement('button');
-            tombol.type = 'button';
-            tombol.textContent = nama;
-            tombol.dataset.kategori = i === 0 ? '' : nama;
-            tombol.className = 'tombol-kategori px-3 py-1 rounded-full border text-[11px] font-semibold';
-            tombol.onclick = () => tampilPeserta(tombol.dataset.kategori);
-            filter.appendChild(tombol);
-        });
+        filter.classList.toggle('hidden', kategoriSekolah.length <= 1);
+        if (kategoriSekolah.length > 1) {
+            ['Semua kategori', ...kategoriSekolah].forEach((nama, i) => {
+                const tombol = document.createElement('button');
+                tombol.type = 'button';
+                tombol.textContent = nama;
+                tombol.dataset.kategori = i === 0 ? '' : nama;
+                tombol.onclick = () => tampilPeserta(tombol.dataset.kategori);
+                tombol.className = 'tombol-kategori';
+                filter.appendChild(tombol);
+            });
+        }
 
         tampilPeserta('');
         openModal('modalPeserta');
@@ -228,60 +267,72 @@ $keterangan = function ($k) use ($tgl) {
             daftar = [...daftar].sort((a, b) => (a.peringkat || 99) - (b.peringkat || 99) || (b.nilai || 0) - (a.nilai || 0));
         }
 
-        const isi = document.getElementById('p_isi');
-        isi.innerHTML = '';
+        const wadah = document.getElementById('p_kartu');
+        wadah.innerHTML = '';
         document.getElementById('p_kosong').classList.toggle('hidden', daftar.length > 0);
-        document.getElementById('p_tabel').classList.toggle('hidden', daftar.length === 0);
 
-        const warnaJuara = {
-            1: 'bg-amber-100 text-amber-700',
-            2: 'bg-slate-200 text-slate-700',
-            3: 'bg-orange-100 text-orange-700'
+        const buat = (tag, kelas, teks) => {
+            const el = document.createElement(tag);
+            if (kelas) el.className = kelas;
+            if (teks !== undefined) el.textContent = teks;
+            return el;
         };
 
-        daftar.forEach((p, i) => {
-            const tr = document.createElement('tr');
-            tr.className = p.milik_sendiri ? 'bg-violet-50/60' : '';
+        daftar.forEach(p => {
+            const juara = diumumkan && WARNA_JUARA[p.peringkat];
+            const warna = juara || WARNA_BIASA;
 
-            const sel = (teks, kelas = '') => {
-                const td = document.createElement('td');
-                td.className = 'py-2.5 pr-3 ' + kelas;
-                if (teks instanceof Node) td.appendChild(teks);
-                else td.textContent = teks || '-';
-                return td;
-            };
+            const kartu = buat('div', 'border border-slate-200 rounded-2xl overflow-hidden shadow-sm');
 
-            // Kolom posisi: medali kalau juara, nomor urut kalau bukan
-            let posisi = String(i + 1);
-            if (diumumkan && p.peringkat) {
-                posisi = document.createElement('span');
-                posisi.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ' + (warnaJuara[p.peringkat] || '');
-                posisi.textContent = 'Juara ' + p.peringkat;
-            }
+            // Pita atas: medali + kategori
+            const pita = buat('div', 'px-4 py-2.5 flex flex-wrap justify-between items-center gap-2 ' + warna.pita);
+            const status = buat('div', 'font-bold flex items-center gap-2');
+            const ikon = buat('i', 'fa-solid ' + (juara ? 'fa-medal' : (diumumkan ? 'fa-flag-checkered' : 'fa-hourglass-half')));
+            status.append(ikon, document.createTextNode(juara ? 'Juara ' + p.peringkat : (diumumkan ? 'Peserta' : 'Menunggu pengumuman')));
+            pita.append(status, buat('span', 'text-[11px] font-semibold opacity-80', p.nama_kategori || ''));
 
-            // Kolom karya + penanda sekolah sendiri
-            const karya = document.createElement('div');
-            const judul = document.createElement('div');
-            judul.className = 'font-semibold text-slate-800';
-            judul.textContent = p.judul_karya;
-            karya.appendChild(judul);
-            if (p.milik_sendiri) {
-                const tanda = document.createElement('span');
-                tanda.className = 'text-[10px] font-bold text-violet-700';
-                tanda.textContent = 'Karya sekolah Anda';
-                karya.appendChild(tanda);
-            }
+            // Isi: peserta & karya
+            const isi = buat('div', 'grid grid-cols-1 md:grid-cols-2 gap-4 p-4');
 
-            tr.append(
-                sel(posisi, 'text-slate-400'),
-                sel(karya),
-                sel(p.nama_sekolah),
-                sel(p.nama_kategori, 'text-slate-500')
+            const kolomPeserta = buat('div', 'flex gap-3');
+            kolomPeserta.append(buat('div', 'w-9 h-9 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center shrink-0'));
+            kolomPeserta.firstChild.appendChild(buat('i', 'fa-solid fa-user'));
+            const infoPeserta = buat('div', 'min-w-0');
+            infoPeserta.append(
+                buat('div', 'text-[10px] text-slate-400 uppercase font-bold tracking-wider', 'Peserta'),
+                buat('div', 'font-bold text-slate-800 text-sm', p.nama_guru || '-'),
+                buat('div', 'text-[11px] text-slate-400', p.mapel || '')
             );
-            if (diumumkan) {
-                tr.appendChild(sel(p.nilai ? parseFloat(p.nilai).toFixed(2).replace('.', ',') : '-', 'text-right font-bold text-slate-800'));
+            kolomPeserta.appendChild(infoPeserta);
+
+            const kolomKarya = buat('div', 'flex gap-3');
+            kolomKarya.append(buat('div', 'w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0'));
+            kolomKarya.firstChild.appendChild(buat('i', 'fa-solid fa-lightbulb'));
+            const infoKarya = buat('div', 'min-w-0');
+            infoKarya.append(
+                buat('div', 'text-[10px] text-slate-400 uppercase font-bold tracking-wider', 'Karya'),
+                buat('div', 'font-bold text-slate-800 text-sm leading-snug', p.judul_karya || '-')
+            );
+            kolomKarya.appendChild(infoKarya);
+
+            isi.append(kolomPeserta, kolomKarya);
+
+            // Bawah: total nilai
+            const bawah = buat('div', 'border-t bg-slate-50 px-4 py-3 flex justify-between items-center');
+            bawah.appendChild(buat('span', 'text-slate-500 font-semibold', 'Total Nilai'));
+            if (diumumkan && p.nilai) {
+                const nilai = buat('div', 'text-right');
+                nilai.append(
+                    buat('span', 'text-2xl font-extrabold ' + (juara ? warna.teks : 'text-slate-800'), parseFloat(p.nilai).toFixed(2).replace('.', ',')),
+                    buat('span', 'text-slate-400 font-semibold ml-1', '/ 100')
+                );
+                bawah.appendChild(nilai);
+            } else {
+                bawah.appendChild(buat('span', 'text-slate-400 italic', 'Tampil setelah diumumkan'));
             }
-            isi.appendChild(tr);
+
+            kartu.append(pita, isi, bawah);
+            wadah.appendChild(kartu);
         });
     }
 </script>

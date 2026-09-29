@@ -62,3 +62,10 @@ $routes->post('profil/password', 'Cprofil::password');
 $routes->post('profil/tim', 'Cprofil::tambahAdmin');
 $routes->post('profil/tim/status/(:num)', 'Cprofil::statusAdmin/$1');
 $routes->post('suara/kirim', 'Csuara::kirim');
+
+// Data Guru (Admin Sekolah)
+$routes->get('guru', 'Cguru::index');
+$routes->post('guru/simpan', 'Cguru::simpan');
+$routes->post('guru/akun/(:num)', 'Cguru::akun/$1');
+$routes->post('guru/status/(:num)', 'Cguru::status/$1');
+$routes->post('guru/hapus/(:num)', 'Cguru::hapus/$1');
