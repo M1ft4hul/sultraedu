@@ -76,7 +76,7 @@ $warna = $warnaRole[$role] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/3
                     <div class="border-t border-slate-700 mx-3 mb-1"></div>
 
                     <!-- Menu Profil (nanti) -->
-                    <a href="<?= base_url('profil') ?>" class="block px-4 py-2.5 text-sm rounded-xl hover:bg-slate-800 transition">
+                    <a href="<?= site_url('profil') ?>" class="block px-4 py-2.5 text-sm rounded-xl hover:bg-slate-800 transition">
                         Profil Saya
                     </a>
 
