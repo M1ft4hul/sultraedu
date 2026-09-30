@@ -91,3 +91,7 @@ $routes->get('penilaian', 'Cpenilaian::index');
 $routes->post('penilaian/simpan/(:num)', 'Cpenilaian::simpan/$1');
 $routes->post('penilaian/tolak/(:num)', 'Cpenilaian::tolak/$1');
 $routes->post('penilaian/batal-tolak/(:num)', 'Cpenilaian::batalTolak/$1');
+
+// Rekap Penilaian (Admin Dinas)
+$routes->get('rekap-penilaian', 'Crekap::index');
+$routes->get('rekap-penilaian/export/(:num)', 'Crekap::export/$1');

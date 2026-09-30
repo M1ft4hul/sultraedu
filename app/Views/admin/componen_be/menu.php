@@ -53,6 +53,9 @@ $aktif   = fn($slug) => str_contains($uri, $slug) ? 'active-tab' : '';
                     <a href="<?= site_url('juri') ?>" class="flex items-center px-3 py-2 text-sm rounded-lg hover:bg-slate-50">
                         <i class="fa-solid fa-gavel w-5 text-slate-400"></i> Akun Juri
                     </a>
+                    <a href="<?= site_url('rekap-penilaian') ?>" class="flex items-center px-3 py-2 text-sm rounded-lg hover:bg-slate-50">
+                        <i class="fa-solid fa-table-list w-5 text-slate-400"></i> Rekap Penilaian
+                    </a>
                 </div>
             </div>
         <?php endif; ?>
