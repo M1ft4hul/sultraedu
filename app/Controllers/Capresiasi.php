@@ -72,9 +72,79 @@ class Capresiasi extends BaseController
                 return $this->indexDinas();
             case 'admin_sekolah':
                 return $this->indexSekolah();
+            case 'guru':
+                return $this->indexGuru();
         }
 
         return redirect()->to('dashboard');
+    }
+
+    // =====================================================
+    // GURU: lemari piala & unduh piagam
+    // =====================================================
+    private function indexGuru()
+    {
+        $prestasi = \Config\Database::connect()->table('apresiasi a')
+            ->select('a.bukti_file, a.updated_at AS tanggal_piagam,
+                      p.judul_karya, p.peringkat, p.nilai,
+                      k.nama_kompetisi, k.tanggal_mulai, k.tanggal_pengumuman,
+                      kk.nama_kategori')
+            ->join('kompetisi_peserta p', 'p.id_peserta = a.id_peserta')
+            ->join('kompetisi k', 'k.id_kompetisi = p.id_kompetisi')
+            ->join('kompetisi_kategori kk', 'kk.id_kategori = p.id_kategori', 'left')
+            ->where('p.id_guru', session()->get('user_id'))
+            ->where('k.hasil_diumumkan', 1)
+            ->orderBy('k.tanggal_pengumuman', 'DESC')
+            ->orderBy('p.peringkat', 'ASC')
+            ->get()->getResultArray();
+
+        // Total keseluruhan (untuk banner lemari piala)
+        $medali = [1 => 0, 2 => 0, 3 => 0];
+        foreach ($prestasi as $p) {
+            if (isset($medali[(int) $p['peringkat']])) {
+                $medali[(int) $p['peringkat']]++;
+            }
+        }
+        $tersedia = count(array_filter($prestasi, fn($p) => ! empty($p['bukti_file'])));
+
+        // ---------- Filter: tahun, bulan, juara ----------
+        $daftarTahun = array_values(array_unique(array_map(
+            fn($p) => date('Y', strtotime($p['tanggal_pengumuman'] ?? $p['tanggal_mulai'])),
+            $prestasi
+        )));
+        rsort($daftarTahun);
+
+        $filter = [
+            'tahun' => (string) $this->request->getGet('tahun'),
+            'bulan' => (string) $this->request->getGet('bulan'),
+            'juara' => (string) $this->request->getGet('juara'),
+        ];
+        if (! in_array($filter['tahun'], $daftarTahun, true)) {
+            $filter['tahun'] = '';
+        }
+        if (! in_array((int) $filter['bulan'], range(1, 12), true)) {
+            $filter['bulan'] = '';
+        }
+        if (! in_array((int) $filter['juara'], [1, 2, 3], true)) {
+            $filter['juara'] = '';
+        }
+
+        $tampil = array_values(array_filter($prestasi, function ($p) use ($filter) {
+            $waktu = strtotime($p['tanggal_pengumuman'] ?? $p['tanggal_mulai']);
+
+            return ($filter['tahun'] === '' || date('Y', $waktu) === $filter['tahun'])
+                && ($filter['bulan'] === '' || (int) date('n', $waktu) === (int) $filter['bulan'])
+                && ($filter['juara'] === '' || (int) $p['peringkat'] === (int) $filter['juara']);
+        }));
+
+        return view('admin/guru/apresiasi', [
+            'prestasi'    => $tampil,
+            'totalSemua'  => count($prestasi),
+            'medali'      => $medali,
+            'tersedia'    => $tersedia,
+            'daftarTahun' => $daftarTahun,
+            'filter'      => $filter,
+        ]);
     }
 
     // =====================================================
@@ -104,7 +174,7 @@ class Capresiasi extends BaseController
             ->get()->getResultArray();
 
         // Rincian nilai per kriteria (rata-rata semua juri), hanya untuk hasil yang sudah diumumkan
-        $idDiumumkan = array_column(array_filter($rows, fn ($r) => $r['hasil_diumumkan']), 'id_peserta');
+        $idDiumumkan = array_column(array_filter($rows, fn($r) => $r['hasil_diumumkan']), 'id_peserta');
         $rincian     = [];
 
         if ($idDiumumkan) {
@@ -163,13 +233,14 @@ class Capresiasi extends BaseController
             $idKompetisi = '';
         }
 
-        $rows = array_values(array_filter($rows, fn ($r) =>
-            ($tahun === 'semua' || $r['tahun'] === $tahun)
-            && ($idKompetisi === '' || (string) $r['id_kompetisi'] === $idKompetisi)
+        $rows = array_values(array_filter(
+            $rows,
+            fn($r) => ($tahun === 'semua' || $r['tahun'] === $tahun)
+                && ($idKompetisi === '' || (string) $r['id_kompetisi'] === $idKompetisi)
         ));
 
         // Kartu prestasi = karya yang menjadi juara
-        $prestasi = array_values(array_filter($rows, fn ($r) => $r['id_apresiasi'] !== null));
+        $prestasi = array_values(array_filter($rows, fn($r) => $r['id_apresiasi'] !== null));
 
         return view('admin/sekolah/apresiasi', [
             'prestasi'    => $prestasi,
@@ -180,7 +251,7 @@ class Capresiasi extends BaseController
             'ringkas'     => [
                 'ikut'     => count($rows),
                 'juara'    => count($prestasi),
-                'tersedia' => count(array_filter($prestasi, fn ($p) => ! empty($p['bukti_file']))),
+                'tersedia' => count(array_filter($prestasi, fn($p) => ! empty($p['bukti_file']))),
             ],
         ]);
     }
