@@ -104,6 +104,8 @@ class Csuara extends BaseController
                 return $this->indexDinas();
             case 'admin_sekolah':
                 return $this->indexSekolah();
+            case 'guru':
+                return $this->indexGuru();
         }
 
         return redirect()->to('dashboard');
@@ -131,11 +133,30 @@ class Csuara extends BaseController
     }
 
     // =====================================================
-    // KIRIM SUARA (Admin Sekolah)
+    // GURU: kirim SUARA & lihat riwayat kiriman sendiri
+    // =====================================================
+    private function indexGuru()
+    {
+        $riwayat = \Config\Database::connect()->table('suara')
+            ->select('id_suara, kategori, isi_suara, tanggal_kirim, status_tindak_lanjut, tanggapan, tanggal_tindak_lanjut')
+            ->where('id_guru', session()->get('user_id'))
+            ->orderBy('tanggal_kirim', 'DESC')
+            ->get()->getResultArray();
+
+        return view('admin/guru/suara', [
+            'riwayat'  => $riwayat,
+            'kategori' => self::KATEGORI,
+            'status'   => self::STATUS,
+        ]);
+    }
+
+    // =====================================================
+    // KIRIM SUARA (Admin Sekolah & Guru)
     // =====================================================
     public function kirim()
     {
-        if (! session()->get('logged_in') || session()->get('role') !== 'admin_sekolah') {
+        $role = session()->get('role');
+        if (! session()->get('logged_in') || ! in_array($role, ['admin_sekolah', 'guru'], true)) {
             return redirect()->to('dashboard');
         }
 
@@ -160,17 +181,30 @@ class Csuara extends BaseController
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
 
-        $akun = (new \App\Models\AdminModel())->find(session()->get('user_id'));
+        $data = [
+            'id_sekolah'    => session()->get('id_sekolah'),
+            'kategori'      => $input['kategori'],
+            'isi_suara'     => $input['isi_suara'],
+            'tanggal_kirim' => date('Y-m-d H:i:s'),
+        ];
 
-        \Config\Database::connect()->table('suara')->insert([
-            'id_sekolah'        => session()->get('id_sekolah'),
-            'id_admin_pengirim' => session()->get('user_id'),
-            'nama_pengirim'     => $akun['nama_admin'] ?? session()->get('nama'),
-            'email_pengirim'    => $akun['email'] ?? null,
-            'kategori'          => $input['kategori'],
-            'isi_suara'         => $input['isi_suara'],
-            'tanggal_kirim'     => date('Y-m-d H:i:s'),
-        ]);
+        // Identitas pengirim sesuai jenis akun
+        if ($role === 'guru') {
+            $guru = (new \App\Models\GuruModel())->find(session()->get('user_id'));
+            $data += [
+                'id_guru'       => session()->get('user_id'),
+                'nama_pengirim' => $guru['nama_guru'] ?? session()->get('nama'),
+            ];
+        } else {
+            $akun = (new \App\Models\AdminModel())->find(session()->get('user_id'));
+            $data += [
+                'id_admin_pengirim' => session()->get('user_id'),
+                'nama_pengirim'     => $akun['nama_admin'] ?? session()->get('nama'),
+                'email_pengirim'    => $akun['email'] ?? null,
+            ];
+        }
+
+        \Config\Database::connect()->table('suara')->insert($data);
 
         return redirect()->to('suara')->with('sukses', 'Terima kasih! SUARA Anda sudah terkirim ke Dinas.');
     }
