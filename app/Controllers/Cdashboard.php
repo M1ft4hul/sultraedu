@@ -137,10 +137,113 @@ class Cdashboard extends BaseController
     }
 
     // =====================================================
-    // GURU (nanti dilengkapi)
+    // GURU
     // =====================================================
     private function dashboardGuru()
     {
-        return view('admin/guru/dashboard');
+        $db     = \Config\Database::connect();
+        $idGuru = (int) session()->get('user_id');
+
+        // Identitas guru & sekolahnya
+        $data['guru'] = $db->table('guru g')
+            ->select('g.nama_guru, g.nip, g.mapel, s.nama_sekolah, s.npsn, s.kabupaten_kota')
+            ->join('sekolah s', 's.id_sekolah = g.id_sekolah', 'left')
+            ->where('g.id_guru', $idGuru)
+            ->get()->getRowArray();
+
+        // ---------- Pengajuan: praktik baik + inovasi milik guru ini ----------
+        $praktik = $db->table('praktik_baik')
+            ->select("id_praktik_baik AS id, judul, tanggal_upload AS tanggal, updated_at,
+                      status_verifikasi_sekolah AS st_sekolah, status_verifikasi_dinas AS st_dinas,
+                      catatan_admin_sekolah AS catatan_sekolah, catatan_petugas AS catatan_dinas,
+                      'praktik' AS jenis", false)
+            ->where('id_guru', $idGuru)
+            ->get()->getResultArray();
+
+        $inovasi = $db->table('bank_inovasi')
+            ->select("id_inovasi AS id, judul_inovasi AS judul, created_at AS tanggal, updated_at,
+                      status_verifikasi_sekolah AS st_sekolah, status_verifikasi AS st_dinas,
+                      catatan_sekolah, catatan_verifikasi AS catatan_dinas,
+                      'inovasi' AS jenis", false)
+            ->where('id_guru', $idGuru)
+            ->get()->getResultArray();
+
+        $pengajuan = array_merge($praktik, $inovasi);
+
+        // Tentukan posisi setiap pengajuan dalam alur dua tahap
+        foreach ($pengajuan as &$p) {
+            if ($p['st_sekolah'] === 'menunggu') {
+                $p['tahap'] = 'tunggu_sekolah';
+            } elseif ($p['st_sekolah'] === 'ditolak') {
+                $p['tahap'] = 'tolak_sekolah';
+            } elseif ($p['st_dinas'] === 'menunggu') {
+                $p['tahap'] = 'tunggu_dinas';
+            } elseif ($p['st_dinas'] === 'ditolak') {
+                $p['tahap'] = 'tolak_dinas';
+            } else {
+                $p['tahap'] = 'disetujui';
+            }
+        }
+        unset($p);
+
+        // Terbaru diperbarui di atas
+        usort($pengajuan, fn($a, $b) => strcmp((string) $b['updated_at'], (string) $a['updated_at']));
+
+        $hitung = fn(array $tahap) => count(array_filter($pengajuan, fn($p) => in_array($p['tahap'], $tahap, true)));
+
+        $data['perbaikan'] = array_values(array_filter($pengajuan, fn($p) => in_array($p['tahap'], ['tolak_sekolah', 'tolak_dinas'], true)));
+        $data['pengajuan'] = array_slice($pengajuan, 0, 5);
+
+        // ---------- Kompetisi ----------
+        $diikuti = $db->table('kompetisi_peserta')->select('id_kompetisi')
+            ->where('id_guru', $idGuru)->get()->getResultArray();
+        $idDiikuti = array_map('intval', array_column($diikuti, 'id_kompetisi'));
+
+        $data['kompetisiBuka'] = $db->table('kompetisi')
+            ->select('id_kompetisi, nama_kompetisi, tanggal_mulai, tanggal_selesai')
+            ->where('status', 'pendaftaran')
+            ->orderBy('tanggal_selesai', 'ASC')
+            ->limit(3)
+            ->get()->getResultArray();
+        foreach ($data['kompetisiBuka'] as &$k) {
+            $k['terdaftar'] = in_array((int) $k['id_kompetisi'], $idDiikuti, true);
+        }
+        unset($k);
+
+        // ---------- Prestasi (juara) ----------
+        $data['prestasi'] = $db->table('apresiasi a')
+            ->select('a.bukti_file, p.judul_karya, p.peringkat, p.nilai, k.nama_kompetisi, kk.nama_kategori')
+            ->join('kompetisi_peserta p', 'p.id_peserta = a.id_peserta')
+            ->join('kompetisi k', 'k.id_kompetisi = p.id_kompetisi')
+            ->join('kompetisi_kategori kk', 'kk.id_kategori = p.id_kategori', 'left')
+            ->where('p.id_guru', $idGuru)
+            ->orderBy('k.tanggal_pengumuman', 'DESC')
+            ->limit(3)
+            ->get()->getResultArray();
+
+        // ---------- Jadwal Monev untuk karya guru ini ----------
+        $data['monev'] = $db->table('monev m')
+            ->select('m.tanggal_monev, m.aspek_monev, m.status, p.judul_karya')
+            ->join('kompetisi_peserta p', 'p.id_peserta = m.id_peserta')
+            ->where('p.id_guru', $idGuru)
+            ->where('m.status', 'dijadwalkan')
+            ->orderBy('m.tanggal_monev', 'ASC')
+            ->limit(3)
+            ->get()->getResultArray();
+
+        // ---------- Statistik ----------
+        $data['stat'] = [
+            'disetujui' => $hitung(['disetujui']),
+            'diproses'  => $hitung(['tunggu_sekolah', 'tunggu_dinas']),
+            'perbaikan' => count($data['perbaikan']),
+            'kompetisi' => count($idDiikuti),
+            'juara'     => $db->table('apresiasi a')
+                ->join('kompetisi_peserta p', 'p.id_peserta = a.id_peserta')
+                ->where('p.id_guru', $idGuru)->countAllResults(),
+        ];
+
+        $data['pengumuman'] = $this->ambilPengumuman($db);
+
+        return view('admin/guru/dashboard', $data);
     }
 }
