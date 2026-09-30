@@ -56,6 +56,12 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
             <i class="fa-solid fa-circle-exclamation mr-2"></i><?= session()->getFlashdata('gagal') ?>
         </div>
     <?php endif; ?>
+    <?php if (session()->getFlashdata('peringatan')) : ?>
+        <div class="bg-amber-50 border border-amber-300 text-amber-900 text-xs px-4 py-3 rounded-xl flex items-start justify-between gap-3">
+            <span><i class="fa-solid fa-triangle-exclamation mr-2"></i><?= esc(session()->getFlashdata('peringatan')) ?></span>
+            <a href="<?= site_url('juri') ?>" class="shrink-0 font-bold hover:underline">Atur Juri <i class="fa-solid fa-arrow-right ml-1"></i></a>
+        </div>
+    <?php endif; ?>
 
     <!-- Tab -->
     <div class="flex flex-wrap gap-2 text-xs font-semibold">

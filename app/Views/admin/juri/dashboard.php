@@ -5,6 +5,7 @@
 /** @var array $stat */
 /** @var array $riwayat */
 /** @var array $pengumuman */
+/** @var bool $adaTugas */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
@@ -90,8 +91,13 @@ $kartu = [
                                 <i class="fa-solid fa-mug-hot text-2xl text-amber-500"></i>
                             </div>
                         </div>
-                        <p class="text-sm font-semibold text-slate-700">Belum ada lomba yang perlu dinilai</p>
-                        <p class="text-xs text-slate-400 mt-1 max-w-[300px] leading-relaxed">Lomba akan muncul di sini setelah Dinas menutup pendaftaran dan memulai tahap penjurian.</p>
+                        <?php if (! $adaTugas) : ?>
+                            <p class="text-sm font-semibold text-slate-700">Anda belum ditugaskan menilai</p>
+                            <p class="text-xs text-slate-400 mt-1 max-w-[300px] leading-relaxed">Dinas akan menentukan kategori lomba yang Anda nilai. Hubungi Admin Dinas bila tugas Anda belum muncul.</p>
+                        <?php else : ?>
+                            <p class="text-sm font-semibold text-slate-700">Belum ada lomba yang perlu dinilai</p>
+                            <p class="text-xs text-slate-400 mt-1 max-w-[300px] leading-relaxed">Kategori tugas Anda akan muncul di sini setelah Dinas menutup pendaftaran dan memulai tahap penjurian.</p>
+                        <?php endif; ?>
                     </div>
                 <?php else : ?>
                     <?php foreach ($kompetisi as $k) : ?>
@@ -101,7 +107,7 @@ $kartu = [
                             <div class="flex flex-wrap justify-between items-start gap-3">
                                 <div class="min-w-0">
                                     <div class="font-bold text-slate-800 text-sm"><?= esc($k['nama_kompetisi']) ?></div>
-                                    <div class="text-[11px] text-slate-500"><?= $k['total'] ?> karya • <?= count($k['kategori']) ?> kategori • <?= $k['kriteria'] ?> kriteria penilaian</div>
+                                    <div class="text-[11px] text-slate-500"><?= $k['total'] ?> karya • <?= count($k['kategori']) ?> kategori tugas Anda • <?= $k['kriteria'] ?> kriteria penilaian</div>
                                 </div>
                                 <?php if ($tuntas) : ?>
                                     <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full"><i class="fa-solid fa-check mr-1"></i>Semua karya sudah dinilai</span>

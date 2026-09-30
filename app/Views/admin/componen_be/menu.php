@@ -47,7 +47,10 @@ $aktif   = fn($slug) => str_contains($uri, $slug) ? 'active-tab' : '';
                         <i class="fa-solid fa-school w-5 text-slate-400"></i> Data Sekolah
                     </a>
                     <a href="<?= site_url('pengguna') ?>" class="flex items-center px-3 py-2 text-sm rounded-lg hover:bg-slate-50">
-                        <i class="fa-solid fa-users-gear w-5 text-slate-400"></i> Akun Pengguna
+                        <i class="fa-solid fa-users-gear w-5 text-slate-400"></i> Akun Admin Sekolah
+                    </a>
+                    <a href="<?= site_url('juri') ?>" class="flex items-center px-3 py-2 text-sm rounded-lg hover:bg-slate-50">
+                        <i class="fa-solid fa-gavel w-5 text-slate-400"></i> Akun Juri
                     </a>
                 </div>
             </div>

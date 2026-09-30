@@ -653,10 +653,34 @@ class Ckompetisi extends BaseController
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
 
-        return redirect()->to('kompetisi')->with(
+        $redirect = redirect()->to('kompetisi')->with(
             'sukses',
             'Tahap "' . esc($kompetisi['nama_kompetisi']) . '" sekarang: ' . self::STATUS[$target] . '.'
         );
+
+        // Saat penjurian dimulai: ingatkan kategori yang punya karya tapi belum punya juri aktif
+        if ($target === 'berlangsung') {
+            $tanpaJuri = $db->query(
+                "SELECT kk.nama_kategori
+                 FROM kompetisi_kategori kk
+                 WHERE kk.id_kompetisi = ?
+                   AND EXISTS (SELECT 1 FROM kompetisi_peserta p WHERE p.id_kategori = kk.id_kategori AND p.status_validasi != 'ditolak')
+                   AND NOT EXISTS (
+                       SELECT 1 FROM juri_penugasan jp
+                       JOIN admin a ON a.id_admin = jp.id_juri AND a.status = 'aktif'
+                       WHERE jp.id_kategori = kk.id_kategori)
+                 ORDER BY kk.urutan",
+                [$id]
+            )->getResultArray();
+
+            if ($tanpaJuri) {
+                $redirect->with('peringatan', 'Kategori berikut belum memiliki juri: '
+                    . implode(', ', array_map(fn($r) => $r['nama_kategori'], $tanpaJuri))
+                    . '. Tugaskan juri melalui menu Kelola Data → Tim Juri supaya karyanya bisa dinilai.');
+            }
+        }
+
+        return $redirect;
     }
 
     // =====================================================

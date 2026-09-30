@@ -78,3 +78,10 @@ $routes->post('bank-inovasi/hapus/(:num)', 'CbankInovasi::hapus/$1');
 
 $routes->post('kompetisi/daftar', 'Ckompetisi::daftar');
 $routes->post('kompetisi/batal/(:num)', 'Ckompetisi::batal/$1');
+
+// Tim Juri (Admin Dinas)
+$routes->get('juri', 'Cjuri::index');
+$routes->post('juri/simpan', 'Cjuri::simpan');
+$routes->post('juri/tugas/(:num)', 'Cjuri::tugas/$1');
+$routes->post('juri/reset/(:num)', 'Cjuri::reset/$1');
+$routes->post('juri/status/(:num)', 'Cjuri::status/$1');

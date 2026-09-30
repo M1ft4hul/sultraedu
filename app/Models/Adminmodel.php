@@ -16,13 +16,16 @@ class AdminModel extends Model
         'role',
         'id_sekolah',
         'email',
+        'keterangan',
         'status',
     ];
 
+    // created_at & updated_at diisi otomatis
     protected $useTimestamps = true;
     protected $createdField  = 'created_at';
     protected $updatedField  = 'updated_at';
 
+    // Password otomatis di-hash saat tambah/ubah akun lewat model
     protected $beforeInsert = ['hashPassword'];
     protected $beforeUpdate = ['hashPassword'];
 
@@ -31,6 +34,7 @@ class AdminModel extends Model
         if (! empty($data['data']['password'])) {
             $password = $data['data']['password'];
 
+            // Hindari hash ganda kalau password sudah dalam bentuk hash
             if (password_get_info($password)['algo'] === null) {
                 $data['data']['password'] = password_hash($password, PASSWORD_DEFAULT);
             }

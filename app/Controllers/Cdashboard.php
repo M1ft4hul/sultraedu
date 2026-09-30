@@ -137,12 +137,25 @@ class Cdashboard extends BaseController
         $db     = \Config\Database::connect();
         $idJuri = (int) session()->get('user_id');
 
-        // ---------- Lomba yang sedang dalam tahap penjurian ----------
-        $kompetisi = $db->table('kompetisi')
-            ->select('id_kompetisi, nama_kompetisi, tanggal_mulai, tanggal_selesai')
-            ->where('status', 'berlangsung')
-            ->orderBy('tanggal_selesai', 'ASC')
-            ->get()->getResultArray();
+        // ---------- Kategori yang ditugaskan kepada juri ini ----------
+        $kategoriTugas = array_map('intval', array_column(
+            $db->table('juri_penugasan')->select('id_kategori')->where('id_juri', $idJuri)->get()->getResultArray(),
+            'id_kategori'
+        ));
+
+        // ---------- Lomba penjurian yang punya kategori tugas juri ini ----------
+        $kompetisi = [];
+        if ($kategoriTugas) {
+            $kompetisi = $db->table('kompetisi k')
+                ->select('k.id_kompetisi, k.nama_kompetisi, k.tanggal_mulai, k.tanggal_selesai')
+                ->join('kompetisi_kategori kk', 'kk.id_kompetisi = k.id_kompetisi')
+                ->where('k.status', 'berlangsung')
+                ->whereIn('kk.id_kategori', $kategoriTugas)
+                ->groupBy('k.id_kompetisi, k.nama_kompetisi, k.tanggal_mulai, k.tanggal_selesai')
+                ->orderBy('k.tanggal_selesai', 'ASC')
+                ->get()->getResultArray();
+        }
+        $data['adaTugas'] = ! empty($kategoriTugas);
 
         $ids      = array_column($kompetisi, 'id_kompetisi');
         $peserta  = [];
@@ -151,11 +164,12 @@ class Cdashboard extends BaseController
         $kategori = [];
 
         if ($ids) {
-            // Karya yang dinilai: semua karya yang tidak ditolak
+            // Karya yang dinilai: karya di kategori tugas juri ini yang tidak ditolak
             $peserta = $db->table('kompetisi_peserta p')
                 ->select('p.id_peserta, p.id_kompetisi, p.id_kategori, p.judul_karya, kk.nama_kategori, kk.urutan')
                 ->join('kompetisi_kategori kk', 'kk.id_kategori = p.id_kategori', 'left')
                 ->whereIn('p.id_kompetisi', $ids)
+                ->whereIn('p.id_kategori', $kategoriTugas)
                 ->where('p.status_validasi !=', 'ditolak')
                 ->orderBy('p.created_at', 'ASC')
                 ->get()->getResultArray();
@@ -170,7 +184,8 @@ class Cdashboard extends BaseController
 
             foreach (
                 $db->table('kompetisi_kategori')->select('id_kategori, id_kompetisi, nama_kategori')
-                    ->whereIn('id_kompetisi', $ids)->orderBy('urutan', 'ASC')->get()->getResultArray() as $r
+                    ->whereIn('id_kompetisi', $ids)->whereIn('id_kategori', $kategoriTugas)
+                    ->orderBy('urutan', 'ASC')->get()->getResultArray() as $r
             ) {
                 $kategori[$r['id_kompetisi']][] = $r;
             }
