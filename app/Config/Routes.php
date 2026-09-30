@@ -75,3 +75,6 @@ $routes->post('praktik-baik/simpan', 'CpraktikBaik::simpan');
 $routes->post('praktik-baik/hapus/(:num)', 'CpraktikBaik::hapus/$1');
 $routes->post('bank-inovasi/simpan', 'CbankInovasi::simpan');
 $routes->post('bank-inovasi/hapus/(:num)', 'CbankInovasi::hapus/$1');
+
+$routes->post('kompetisi/daftar', 'Ckompetisi::daftar');
+$routes->post('kompetisi/batal/(:num)', 'Ckompetisi::batal/$1');
