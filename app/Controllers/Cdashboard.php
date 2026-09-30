@@ -130,7 +130,6 @@ class Cdashboard extends BaseController
 
     // =====================================================
     // TIM JURI
-    // Ganti fungsi dashboardJuri() lama di Cdashboard.php dengan fungsi ini
     // =====================================================
     private function dashboardJuri()
     {
