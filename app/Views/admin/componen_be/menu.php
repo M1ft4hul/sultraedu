@@ -9,7 +9,7 @@ $menus = [
     ['label' => 'Bank Inovasi',              'icon' => 'fa-box-archive',        'url' => 'bank-inovasi',       'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
     ['label' => 'Kompetisi Inovasi',      'icon' => 'fa-trophy',                'url' => 'kompetisi',                'roles' => 'semua'],
     ['label' => 'Apresiasi',                    'icon' => 'fa-award',                  'url' => 'apresiasi',               'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
-    ['label' => 'Monev',                        'icon' => 'fa-chart-line',             'url' => 'monev',                   'roles' => ['admin_pusat']],
+    ['label' => 'Monev',                        'icon' => 'fa-chart-line',             'url' => 'monev',                   'roles' => ['admin_pusat', 'guru']],
     ['label' => 'SUARA',                        'icon' => 'fa-comments',          'url' => 'suara',                      'roles' => ['admin_pusat', 'admin_sekolah', 'guru']],
     ['label' => 'Data Guru',               'icon' => 'fa-chalkboard-user',       'url' => 'guru',                     'roles' => ['admin_sekolah']],
 ];

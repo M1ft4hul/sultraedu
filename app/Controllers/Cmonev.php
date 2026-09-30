@@ -28,10 +28,116 @@ class Cmonev extends BaseController
     // =====================================================
     public function index()
     {
-        if (! $this->bolehAkses()) {
-            return redirect()->to('dashboard');
+        if (! session()->get('logged_in')) {
+            return redirect()->to('login');
         }
 
+        switch (session()->get('role')) {
+            case 'admin_pusat':
+                return $this->indexDinas();
+            case 'guru':
+                return $this->indexGuru();
+        }
+
+        return redirect()->to('dashboard');
+    }
+
+    // =====================================================
+    // GURU: jadwal & hasil monitoring karya sendiri
+    // =====================================================
+    private function indexGuru()
+    {
+        $db = \Config\Database::connect();
+
+        $semua = $db->table('monev m')
+            ->select('m.id_monev, m.id_peserta, m.tanggal_monev, m.aspek_monev, m.deskripsi, m.status,
+                      m.hasil_temuan, m.rekomendasi, m.file_hasil, m.tanggal_hasil,
+                      p.judul_karya, p.peringkat, k.nama_kompetisi, kk.nama_kategori')
+            ->join('kompetisi_peserta p', 'p.id_peserta = m.id_peserta')
+            ->join('kompetisi k', 'k.id_kompetisi = p.id_kompetisi')
+            ->join('kompetisi_kategori kk', 'kk.id_kategori = p.id_kategori', 'left')
+            ->where('p.id_guru', session()->get('user_id'))
+            ->get()->getResultArray();
+
+        $hariIni = date('Y-m-d');
+        foreach ($semua as &$m) {
+            $m['hari_ini'] = $m['status'] === 'dijadwalkan' && $m['tanggal_monev'] === $hariIni;
+            $m['terlewat'] = $m['status'] === 'dijadwalkan' && $m['tanggal_monev'] < $hariIni;
+            $m['sisa']     = (int) floor((strtotime($m['tanggal_monev']) - strtotime($hariIni)) / 86400);
+            $m['url_file'] = ! $m['file_hasil'] ? null
+                : (preg_match('#^https?://#i', $m['file_hasil']) ? $m['file_hasil'] : base_url($m['file_hasil']));
+        }
+        unset($m);
+
+        // Ringkasan (tidak terpengaruh filter)
+        $jadwal  = array_filter($semua, fn($m) => $m['status'] === 'dijadwalkan');
+        $selesai = array_filter($semua, fn($m) => $m['status'] === 'selesai');
+        $mendatang = array_filter($jadwal, fn($m) => $m['tanggal_monev'] >= $hariIni);
+        usort($mendatang, fn($a, $b) => strcmp($a['tanggal_monev'], $b['tanggal_monev']));
+
+        $ringkas = [
+            'jadwal'   => count($jadwal),
+            'selesai'  => count($selesai),
+            'terdekat' => $mendatang[0] ?? null,
+        ];
+
+        // ---------- Filter ----------
+        $daftarTahun = array_values(array_unique(array_map(fn($m) => substr($m['tanggal_monev'], 0, 4), $semua)));
+        rsort($daftarTahun);
+
+        $daftarKarya = [];
+        foreach ($semua as $m) {
+            $daftarKarya[$m['id_peserta']] = $m['judul_karya'];
+        }
+
+        $filter = [
+            'status' => (string) $this->request->getGet('status'),
+            'tahun'  => (string) $this->request->getGet('tahun'),
+            'karya'  => (string) $this->request->getGet('karya'),
+        ];
+        if (! in_array($filter['status'], ['jadwal', 'selesai'], true)) {
+            $filter['status'] = '';
+        }
+        if (! in_array($filter['tahun'], $daftarTahun, true)) {
+            $filter['tahun'] = '';
+        }
+        if (! isset($daftarKarya[$filter['karya']])) {
+            $filter['karya'] = '';
+        }
+
+        $tampil = array_values(array_filter(
+            $semua,
+            fn($m) => ($filter['status'] === '' || ($filter['status'] === 'jadwal' ? $m['status'] === 'dijadwalkan' : $m['status'] === 'selesai'))
+                && ($filter['tahun'] === '' || substr($m['tanggal_monev'], 0, 4) === $filter['tahun'])
+                && ($filter['karya'] === '' || (string) $m['id_peserta'] === $filter['karya'])
+        ));
+
+        // Jadwal (terdekat dulu) di atas, lalu hasil (terbaru dulu)
+        usort($tampil, function ($a, $b) {
+            if ($a['status'] !== $b['status']) {
+                return $a['status'] === 'dijadwalkan' ? -1 : 1;
+            }
+
+            return $a['status'] === 'dijadwalkan'
+                ? strcmp($a['tanggal_monev'], $b['tanggal_monev'])
+                : strcmp($b['tanggal_monev'], $a['tanggal_monev']);
+        });
+
+        return view('admin/guru/monev', [
+            'monev'       => $tampil,
+            'totalSemua'  => count($semua),
+            'ringkas'     => $ringkas,
+            'filter'      => $filter,
+            'daftarTahun' => $daftarTahun,
+            'daftarKarya' => $daftarKarya,
+        ]);
+    }
+
+    // =====================================================
+    // ADMIN DINAS: indikator, sebaran, dan jadwal monitoring
+    // =====================================================
+    private function indexDinas()
+    {
         $db = \Config\Database::connect();
 
         // ---------- Indikator utama ----------
