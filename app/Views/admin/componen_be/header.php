@@ -23,7 +23,7 @@ $warnaRole = [
 ];
 
 $role  = session()->get('role');
-$namaAdmin  = session()->get('namaAdmin');
+$namaAdmin = session()->get('nama') ?: session()->get('namaAdmin') ?: session()->get('namaGuru');
 $label = $labelRole[$role] ?? $role;
 $warna = $warnaRole[$role] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30';
 ?>
