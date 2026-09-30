@@ -70,3 +70,6 @@ $routes->post('guru/simpan', 'Cguru::simpan');
 $routes->post('guru/akun/(:num)', 'Cguru::akun/$1');
 $routes->post('guru/status/(:num)', 'Cguru::status/$1');
 $routes->post('guru/hapus/(:num)', 'Cguru::hapus/$1');
+
+$routes->post('praktik-baik/simpan', 'CpraktikBaik::simpan');
+$routes->post('praktik-baik/hapus/(:num)', 'CpraktikBaik::hapus/$1');

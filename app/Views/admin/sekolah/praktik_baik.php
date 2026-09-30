@@ -87,7 +87,12 @@ $tabs = ['' => 'Semua'] + $label;
                             <tr class="hover:bg-slate-50 transition">
                                 <td class="p-3.5 max-w-sm">
                                     <div class="font-bold text-slate-800 truncate"><?= esc($p['judul']) ?></div>
-                                    <div class="text-[11px] text-slate-400"><?= esc($p['kategori'] ?: '-') ?></div>
+                                    <div class="text-[11px] text-slate-400">
+                                        <?= esc($p['kategori'] ?: '-') ?>
+                                        <?php if ((int) ($p['jumlah_revisi'] ?? 0) > 0) : ?>
+                                            <span class="ml-1 bg-violet-100 text-violet-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">Revisi ke-<?= (int) $p['jumlah_revisi'] ?></span>
+                                        <?php endif; ?>
+                                    </div>
                                 </td>
                                 <td class="p-3.5">
                                     <?= esc($p['nama_guru'] ?? '-') ?>
@@ -161,6 +166,12 @@ $tabs = ['' => 'Semua'] + $label;
             <div>
                 <h4 class="font-bold text-slate-700 mb-2 uppercase tracking-wider text-[11px]"><i class="fa-solid fa-paperclip text-slate-500 mr-1"></i> Lampiran Dokumen</h4>
                 <div id="d_lampiran" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div>
+            </div>
+
+            <!-- Tanggapan perbaikan dari guru -->
+            <div id="d_revisiWrap" class="hidden bg-violet-50 border border-violet-200 rounded-xl p-3.5 space-y-1">
+                <div class="font-bold text-violet-800"><i class="fa-solid fa-code-branch mr-1"></i>Tanggapan Perbaikan dari Guru <span id="d_revisiKe"></span></div>
+                <p id="d_revisiIsi" class="text-slate-700 whitespace-pre-line"></p>
             </div>
 
             <!-- Riwayat (hanya kalau sudah diverifikasi sekolah) -->
@@ -319,6 +330,14 @@ $tabs = ['' => 'Semua'] + $label;
         form.classList.toggle('hidden', st !== 'menunggu');
         form.action = URL_VERIFIKASI + d.id_praktik_baik;
         document.getElementById('d_catatan_input').value = '';
+
+        // Tanggapan perbaikan guru (kalau pengajuan ini hasil revisi)
+        const adaRevisi = parseInt(d.jumlah_revisi) > 0 && d.catatan_revisi;
+        document.getElementById('d_revisiWrap').classList.toggle('hidden', !adaRevisi);
+        if (adaRevisi) {
+            document.getElementById('d_revisiKe').textContent = '(revisi ke-' + d.jumlah_revisi + ')';
+            document.getElementById('d_revisiIsi').textContent = d.catatan_revisi;
+        }
 
         openModal('modalDetailPraktik');
     }
