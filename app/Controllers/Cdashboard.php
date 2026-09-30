@@ -129,11 +129,127 @@ class Cdashboard extends BaseController
     }
 
     // =====================================================
-    // TIM JURI (nanti dilengkapi)
+    // TIM JURI
+    // Ganti fungsi dashboardJuri() lama di Cdashboard.php dengan fungsi ini
     // =====================================================
     private function dashboardJuri()
     {
-        return view('admin/juri/dashboard');
+        $db     = \Config\Database::connect();
+        $idJuri = (int) session()->get('user_id');
+
+        // ---------- Lomba yang sedang dalam tahap penjurian ----------
+        $kompetisi = $db->table('kompetisi')
+            ->select('id_kompetisi, nama_kompetisi, tanggal_mulai, tanggal_selesai')
+            ->where('status', 'berlangsung')
+            ->orderBy('tanggal_selesai', 'ASC')
+            ->get()->getResultArray();
+
+        $ids      = array_column($kompetisi, 'id_kompetisi');
+        $peserta  = [];
+        $nilaiku  = [];
+        $kriteria = [];
+        $kategori = [];
+
+        if ($ids) {
+            // Karya yang dinilai: semua karya yang tidak ditolak
+            $peserta = $db->table('kompetisi_peserta p')
+                ->select('p.id_peserta, p.id_kompetisi, p.id_kategori, p.judul_karya, kk.nama_kategori, kk.urutan')
+                ->join('kompetisi_kategori kk', 'kk.id_kategori = p.id_kategori', 'left')
+                ->whereIn('p.id_kompetisi', $ids)
+                ->where('p.status_validasi !=', 'ditolak')
+                ->orderBy('p.created_at', 'ASC')
+                ->get()->getResultArray();
+
+            // Jumlah kriteria per lomba (syarat penilaian lengkap)
+            foreach (
+                $db->table('kompetisi_kriteria')->select('id_kompetisi, COUNT(*) AS n')
+                    ->whereIn('id_kompetisi', $ids)->groupBy('id_kompetisi')->get()->getResultArray() as $r
+            ) {
+                $kriteria[$r['id_kompetisi']] = (int) $r['n'];
+            }
+
+            foreach (
+                $db->table('kompetisi_kategori')->select('id_kategori, id_kompetisi, nama_kategori')
+                    ->whereIn('id_kompetisi', $ids)->orderBy('urutan', 'ASC')->get()->getResultArray() as $r
+            ) {
+                $kategori[$r['id_kompetisi']][] = $r;
+            }
+
+            // Skor yang sudah diberikan juri ini
+            $idPeserta = array_column($peserta, 'id_peserta');
+            if ($idPeserta) {
+                foreach (
+                    $db->table('kompetisi_nilai')
+                        ->select('id_peserta, COUNT(*) AS n, SUM(skor) AS total')
+                        ->where('id_juri', $idJuri)->whereIn('id_peserta', $idPeserta)
+                        ->groupBy('id_peserta')->get()->getResultArray() as $r
+                ) {
+                    $nilaiku[$r['id_peserta']] = $r;
+                }
+            }
+        }
+
+        // Tandai karya yang sudah lengkap dinilai juri ini
+        foreach ($peserta as &$p) {
+            $butuh           = $kriteria[$p['id_kompetisi']] ?? 0;
+            $sudah           = (int) ($nilaiku[$p['id_peserta']]['n'] ?? 0);
+            $p['selesai']    = $butuh > 0 && $sudah >= $butuh;
+            $p['sebagian']   = $sudah > 0 && ! $p['selesai'];
+        }
+        unset($p);
+
+        // Progres per lomba & per kategori
+        foreach ($kompetisi as &$k) {
+            $milik          = array_filter($peserta, fn($p) => (int) $p['id_kompetisi'] === (int) $k['id_kompetisi']);
+            $k['total']     = count($milik);
+            $k['dinilai']   = count(array_filter($milik, fn($p) => $p['selesai']));
+            $k['kriteria']  = $kriteria[$k['id_kompetisi']] ?? 0;
+            $k['kategori']  = [];
+            foreach ($kategori[$k['id_kompetisi']] ?? [] as $kat) {
+                $diKat = array_filter($milik, fn($p) => (int) $p['id_kategori'] === (int) $kat['id_kategori']);
+                $k['kategori'][] = [
+                    'nama'    => $kat['nama_kategori'],
+                    'total'   => count($diKat),
+                    'dinilai' => count(array_filter($diKat, fn($p) => $p['selesai'])),
+                ];
+            }
+        }
+        unset($k);
+
+        $namaLomba = array_column($kompetisi, 'nama_kompetisi', 'id_kompetisi');
+
+        // Antrean: karya yang belum lengkap dinilai (yang sudah dimulai didahulukan)
+        $antrean = array_values(array_filter($peserta, fn($p) => ! $p['selesai']));
+        usort($antrean, fn($a, $b) => (int) $b['sebagian'] - (int) $a['sebagian']);
+        foreach ($antrean as &$a) {
+            $a['nama_kompetisi'] = $namaLomba[$a['id_kompetisi']] ?? '-';
+        }
+        unset($a);
+
+        $data['kompetisi'] = $kompetisi;
+        $data['antrean']   = array_slice($antrean, 0, 5);
+        $data['stat']      = [
+            'lomba'   => count($kompetisi),
+            'karya'   => count($peserta),
+            'dinilai' => count(array_filter($peserta, fn($p) => $p['selesai'])),
+            'belum'   => count($antrean),
+        ];
+
+        // ---------- Riwayat penilaian terakhir (semua lomba) ----------
+        $data['riwayat'] = $db->table('kompetisi_nilai n')
+            ->select('p.judul_karya, k.nama_kompetisi, kk.nama_kategori, SUM(n.skor) AS total, MAX(n.updated_at) AS terakhir')
+            ->join('kompetisi_peserta p', 'p.id_peserta = n.id_peserta')
+            ->join('kompetisi k', 'k.id_kompetisi = p.id_kompetisi')
+            ->join('kompetisi_kategori kk', 'kk.id_kategori = p.id_kategori', 'left')
+            ->where('n.id_juri', $idJuri)
+            ->groupBy('n.id_peserta, p.judul_karya, k.nama_kompetisi, kk.nama_kategori')
+            ->orderBy('terakhir', 'DESC')
+            ->limit(5)
+            ->get()->getResultArray();
+
+        $data['pengumuman'] = $this->ambilPengumuman($db);
+
+        return view('admin/juri/dashboard', $data);
     }
 
     // =====================================================
