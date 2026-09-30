@@ -85,3 +85,9 @@ $routes->post('juri/simpan', 'Cjuri::simpan');
 $routes->post('juri/tugas/(:num)', 'Cjuri::tugas/$1');
 $routes->post('juri/reset/(:num)', 'Cjuri::reset/$1');
 $routes->post('juri/status/(:num)', 'Cjuri::status/$1');
+
+// Penilaian (Tim Juri)
+$routes->get('penilaian', 'Cpenilaian::index');
+$routes->post('penilaian/simpan/(:num)', 'Cpenilaian::simpan/$1');
+$routes->post('penilaian/tolak/(:num)', 'Cpenilaian::tolak/$1');
+$routes->post('penilaian/batal-tolak/(:num)', 'Cpenilaian::batalTolak/$1');

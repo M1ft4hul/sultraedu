@@ -168,9 +168,9 @@ class Ckompetisi extends BaseController
                     ->get()->getResultArray();
                 foreach ($baris as $b) {
                     $rincian[$b['id_peserta']][] = [
-                        'kriteria'  => $b['nama_kriteria'],
+                        'kriteria'  => $b['nama_kriteria'] . ' (bobot ' . (int) $b['skor_maks'] . '%)',
                         'skor'      => (float) $b['skor'],
-                        'skor_maks' => (int) $b['skor_maks'],
+                        'skor_maks' => 100, // nilai juri berskala 1–100
                         'juri'      => (int) $b['juri'],
                     ];
                 }

@@ -16,42 +16,87 @@ class Capresiasi extends BaseController
     }
 
     // Peringkat karya tervalidasi berdasarkan rata-rata nilai semua juri
+    // Peringkat per kategori memakai Sistem Pendukung Keputusan (lihat app/Libraries/Spk.php)
     private function hitungPeringkat(int $idKompetisi): array
     {
-        $sql = "SELECT p.id_peserta, p.id_kategori, p.id_sekolah, p.id_guru, p.judul_karya,
-                       s.nama_sekolah, g.nama_guru, k.nama_kategori, k.urutan,
-                       ROUND(AVG(t.total), 2) AS nilai_akhir,
-                       COUNT(t.id_juri)        AS jumlah_juri
-                FROM kompetisi_peserta p
-                LEFT JOIN (
-                    SELECT id_peserta, id_juri, SUM(skor) AS total
-                    FROM kompetisi_nilai
-                    GROUP BY id_peserta, id_juri
-                ) t ON t.id_peserta = p.id_peserta
-                LEFT JOIN sekolah s            ON s.id_sekolah  = p.id_sekolah
-                LEFT JOIN guru g               ON g.id_guru     = p.id_guru
-                LEFT JOIN kompetisi_kategori k ON k.id_kategori = p.id_kategori
-                WHERE p.id_kompetisi = ? AND p.status_validasi = 'tervalidasi'
-                GROUP BY p.id_peserta, p.id_kategori, p.id_sekolah, p.id_guru, p.judul_karya,
-                         s.nama_sekolah, g.nama_guru, k.nama_kategori, k.urutan
-                ORDER BY k.urutan ASC, nilai_akhir DESC";
+        $db = \Config\Database::connect();
 
-        $baris = \Config\Database::connect()->query($sql, [$idKompetisi])->getResultArray();
+        // Karya tervalidasi
+        $peserta = $db->table('kompetisi_peserta p')
+            ->select('p.id_peserta, p.id_kategori, p.id_sekolah, p.id_guru, p.judul_karya,
+                      s.nama_sekolah, g.nama_guru, k.nama_kategori, k.urutan')
+            ->join('sekolah s', 's.id_sekolah = p.id_sekolah', 'left')
+            ->join('guru g', 'g.id_guru = p.id_guru', 'left')
+            ->join('kompetisi_kategori k', 'k.id_kategori = p.id_kategori', 'left')
+            ->where('p.id_kompetisi', $idKompetisi)
+            ->where('p.status_validasi', 'tervalidasi')
+            ->orderBy('k.urutan', 'ASC')
+            ->get()->getResultArray();
 
-        // Kelompokkan per kategori & tandai calon juara
-        $hasil = [];
-        foreach ($baris as $b) {
-            $kunci = $b['id_kategori'] ?? 0;
-            $hasil[$kunci]['nama']      = $b['nama_kategori'] ?? 'Tanpa kategori';
-            $hasil[$kunci]['peserta'][] = $b;
+        // Kriteria & bobot (skor maksimal)
+        $kriteria = $db->table('kompetisi_kriteria')->select('id_kriteria, nama_kriteria, skor_maks')
+            ->where('id_kompetisi', $idKompetisi)->orderBy('urutan', 'ASC')->get()->getResultArray();
+        $bobot = [];
+        foreach ($kriteria as $kr) {
+            $bobot[(int) $kr['id_kriteria']] = (float) $kr['skor_maks'];
         }
+
+        // Rata-rata nilai semua juri per karya per kriteria
+        $rata = [];
+        $juri = [];
+        $ids  = array_column($peserta, 'id_peserta');
+        if ($ids) {
+            foreach (
+                $db->table('kompetisi_nilai')->select('id_peserta, id_kriteria, AVG(skor) AS rata')
+                    ->whereIn('id_peserta', $ids)->groupBy('id_peserta, id_kriteria')->get()->getResultArray() as $r
+            ) {
+                $rata[(int) $r['id_peserta']][(int) $r['id_kriteria']] = (float) $r['rata'];
+            }
+            foreach (
+                $db->table('kompetisi_nilai')->select('id_peserta, COUNT(DISTINCT id_juri) AS n')
+                    ->whereIn('id_peserta', $ids)->groupBy('id_peserta')->get()->getResultArray() as $r
+            ) {
+                $juri[(int) $r['id_peserta']] = (int) $r['n'];
+            }
+        }
+
+        // Kelompokkan per kategori
+        $hasil = [];
+        foreach ($peserta as $p) {
+            $kunci                      = $p['id_kategori'] ?? 0;
+            $p['jumlah_juri']           = $juri[(int) $p['id_peserta']] ?? 0;
+            $p['nilai_akhir']           = null;
+            $hasil[$kunci]['nama']      = $p['nama_kategori'] ?? 'Tanpa kategori';
+            $hasil[$kunci]['peserta'][] = $p;
+        }
+
+        // Hitung SPK per kategori (hanya karya yang sudah dinilai juri)
         foreach ($hasil as &$kat) {
-            $urut = 0;
+            $matriks = [];
+            foreach ($kat['peserta'] as $p) {
+                if ($p['jumlah_juri'] > 0) {
+                    $matriks[(int) $p['id_peserta']] = $rata[(int) $p['id_peserta']] ?? [];
+                }
+            }
+
+            $spk = $matriks ? \App\Libraries\Spk::hitung($matriks, $bobot) : ['nilai' => [], 'langkah' => null];
             foreach ($kat['peserta'] as &$p) {
-                // Hanya karya yang sudah dinilai yang bisa jadi juara
-                $p['calon_juara'] = ($p['jumlah_juri'] > 0 && $urut < self::JUMLAH_JUARA) ? ++$urut : null;
+                $v = $spk['nilai'][(int) $p['id_peserta']] ?? null;
+                // Nilai preferensi 0–1 ditampilkan dalam skala 0–100
+                $p['nilai_akhir'] = $v === null ? null : round($v * 100, 2);
             }
             unset($p);
+
+            // Urutkan dari nilai tertinggi; karya yang belum dinilai di akhir
+            usort($kat['peserta'], fn($a, $b) => ($b['nilai_akhir'] ?? -1) <=> ($a['nilai_akhir'] ?? -1));
+
+            $urut = 0;
+            foreach ($kat['peserta'] as &$p) {
+                $p['calon_juara'] = ($p['nilai_akhir'] !== null && $urut < self::JUMLAH_JUARA) ? ++$urut : null;
+            }
+            unset($p);
+
+            $kat['spk'] = $spk['langkah'];
         }
         unset($kat);
 
@@ -188,9 +233,9 @@ class Capresiasi extends BaseController
 
             foreach ($nilaiKriteria as $n) {
                 $rincian[$n['id_peserta']][] = [
-                    'kriteria'  => $n['nama_kriteria'],
+                    'kriteria'  => $n['nama_kriteria'] . ' (bobot ' . (int) $n['skor_maks'] . '%)',
                     'skor'      => (float) $n['skor'],
-                    'skor_maks' => (int) $n['skor_maks'],
+                    'skor_maks' => 100, // nilai juri berskala 1–100
                 ];
             }
         }

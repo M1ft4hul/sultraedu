@@ -130,6 +130,7 @@ class Cdashboard extends BaseController
 
     // =====================================================
     // TIM JURI
+    // Ganti fungsi dashboardJuri() lama di Cdashboard.php dengan fungsi ini
     // =====================================================
     private function dashboardJuri()
     {
@@ -251,7 +252,9 @@ class Cdashboard extends BaseController
 
         // ---------- Riwayat penilaian terakhir (semua lomba) ----------
         $data['riwayat'] = $db->table('kompetisi_nilai n')
-            ->select('p.judul_karya, k.nama_kompetisi, kk.nama_kategori, SUM(n.skor) AS total, MAX(n.updated_at) AS terakhir')
+            ->select('p.judul_karya, k.nama_kompetisi, kk.nama_kategori,
+                      SUM(n.skor * kr.skor_maks) / 100 AS total, MAX(n.updated_at) AS terakhir')
+            ->join('kompetisi_kriteria kr', 'kr.id_kriteria = n.id_kriteria')
             ->join('kompetisi_peserta p', 'p.id_peserta = n.id_peserta')
             ->join('kompetisi k', 'k.id_kompetisi = p.id_kompetisi')
             ->join('kompetisi_kategori kk', 'kk.id_kategori = p.id_kategori', 'left')
