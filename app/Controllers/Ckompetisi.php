@@ -424,6 +424,7 @@ class Ckompetisi extends BaseController
         $ids      = array_column($kompetisi, 'id_kompetisi');
         $kategori = [];
         $kriteria = [];
+        $peserta  = [];
 
         if ($ids) {
             $rows = $db->table('kompetisi_kategori')->whereIn('id_kompetisi', $ids)
@@ -437,12 +438,30 @@ class Ckompetisi extends BaseController
             foreach ($rows as $r) {
                 $kriteria[$r['id_kompetisi']][] = $r;
             }
+
+            // Peserta lengkap: sekolah, guru, karya, nilai
+            $rows = $db->table('kompetisi_peserta p')
+                ->select('p.id_peserta, p.id_kompetisi, p.id_kategori, p.judul_karya, p.deskripsi_karya, p.link_video,
+                          p.nilai, p.peringkat, p.status_validasi,
+                          s.nama_sekolah, s.kabupaten_kota, g.nama_guru, g.nip, g.mapel')
+                ->join('sekolah s', 's.id_sekolah = p.id_sekolah', 'left')
+                ->join('guru g', 'g.id_guru = p.id_guru', 'left')
+                ->whereIn('p.id_kompetisi', $ids)
+                ->orderBy('p.peringkat IS NULL', 'ASC', false)
+                ->orderBy('p.peringkat', 'ASC')
+                ->orderBy('p.nilai', 'DESC')
+                ->orderBy('s.nama_sekolah', 'ASC')
+                ->get()->getResultArray();
+            foreach ($rows as $r) {
+                $peserta[$r['id_kompetisi']][] = $r;
+            }
         }
 
         foreach ($kompetisi as &$k) {
             $k['jumlah_peserta'] = (int) $k['jumlah_peserta'];
             $k['kategori']       = $kategori[$k['id_kompetisi']] ?? [];
             $k['kriteria']       = $kriteria[$k['id_kompetisi']] ?? [];
+            $k['peserta']        = $peserta[$k['id_kompetisi']] ?? [];
         }
         unset($k);
 

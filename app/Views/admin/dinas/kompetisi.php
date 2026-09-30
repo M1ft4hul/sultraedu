@@ -161,6 +161,17 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
                         </div>
                     </div>
 
+                    <!-- Lihat peserta / juara -->
+                    <?php if ($k['jumlah_peserta'] > 0) : ?>
+                        <button type="button" data-kompetisi="<?= esc(json_encode($k), 'attr') ?>"
+                            onclick="lihatPeserta(JSON.parse(this.dataset.kompetisi))"
+                            class="w-full text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center justify-center border transition
+                                   <?= $k['hasil_diumumkan'] ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100' ?>">
+                            <i class="fa-solid <?= $k['hasil_diumumkan'] ? 'fa-trophy' : 'fa-users' ?> mr-2"></i>
+                            <?= $k['hasil_diumumkan'] ? 'Lihat Juara & Peserta' : 'Lihat Peserta & Karya' ?>
+                        </button>
+                    <?php endif; ?>
+
                     <!-- Tombol tahapan -->
                     <div class="flex flex-wrap justify-between items-center gap-2 pt-3 border-t mt-auto">
                         <div>
@@ -468,5 +479,257 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
                                 ]) ?>);
         });
     <?php endif; ?>
+</script>
+
+<!-- =====================================================
+     MODAL PESERTA & JUARA
+     ===================================================== -->
+<div id="modalPeserta" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-4xl w-full shadow-2xl max-h-[92vh] flex flex-col text-xs">
+        <div class="flex justify-between items-start gap-4 border-b p-5">
+            <div>
+                <span id="ps_badge" class="text-[10px] font-bold px-2.5 py-1 rounded-full"></span>
+                <h3 id="ps_judul" class="font-bold text-slate-800 text-base mt-2"></h3>
+                <p id="ps_sub" class="text-slate-400 mt-0.5"></p>
+            </div>
+            <button type="button" onclick="closeModal('modalPeserta')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <div class="px-5 pt-4 space-y-3">
+            <input type="text" id="ps_cari" oninput="renderPeserta()" placeholder="Cari sekolah, guru, atau judul karya..."
+                class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+            <div id="ps_filter" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <div id="ps_isi" class="overflow-y-auto p-5 space-y-6"></div>
+
+        <div class="flex justify-between items-center border-t p-4 bg-slate-50 rounded-b-2xl">
+            <span id="ps_catatan" class="text-[11px] text-slate-400"></span>
+            <button type="button" onclick="closeModal('modalPeserta')" class="px-4 py-2 border rounded-lg font-semibold text-slate-600 bg-white">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal deskripsi karya -->
+<div id="modalKarya" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[85vh] flex flex-col text-xs">
+        <div class="flex justify-between items-start gap-4 border-b p-5">
+            <div>
+                <h3 id="ky_judul" class="font-bold text-slate-800 text-base leading-snug"></h3>
+                <p id="ky_sub" class="text-slate-400 mt-0.5"></p>
+            </div>
+            <button type="button" onclick="closeModal('modalKarya')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <div class="overflow-y-auto p-5 space-y-3">
+            <div id="ky_deskripsi" class="bg-slate-50 border rounded-xl p-4 text-slate-700 leading-relaxed whitespace-pre-line"></div>
+            <a id="ky_video" target="_blank" rel="noopener" class="hidden inline-flex items-center bg-red-600 hover:bg-red-700 text-white font-semibold px-3 py-1.5 rounded-lg">
+                <i class="fa-brands fa-youtube mr-1.5"></i>Tonton Video Karya
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    let kompetisiAktif = null;
+    let kategoriAktif = '';
+
+    const WARNA_JUARA = {
+        1: {
+            kartu: 'border-amber-300 bg-gradient-to-b from-amber-50 to-white',
+            pita: 'bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-950',
+            ikon: 'text-amber-500'
+        },
+        2: {
+            kartu: 'border-slate-300 bg-gradient-to-b from-slate-50 to-white',
+            pita: 'bg-gradient-to-r from-slate-300 to-slate-400 text-slate-900',
+            ikon: 'text-slate-400'
+        },
+        3: {
+            kartu: 'border-orange-300 bg-gradient-to-b from-orange-50 to-white',
+            pita: 'bg-gradient-to-r from-orange-300 to-orange-400 text-orange-950',
+            ikon: 'text-orange-500'
+        },
+    };
+    const VALIDASI = {
+        menunggu: ['Menunggu validasi', 'bg-amber-100 text-amber-800'],
+        tervalidasi: ['Tervalidasi', 'bg-emerald-100 text-emerald-800'],
+        ditolak: ['Ditolak', 'bg-red-100 text-red-700'],
+    };
+
+    const el = (tag, kelas, teks) => {
+        const e = document.createElement(tag);
+        if (kelas) e.className = kelas;
+        if (teks !== undefined && teks !== null) e.textContent = teks;
+        return e;
+    };
+    const angka = n => (n === null || n === undefined || n === '') ? '–' : parseFloat(n).toFixed(2).replace('.', ',');
+
+    function lihatPeserta(k) {
+        kompetisiAktif = k;
+        kategoriAktif = '';
+        const diumumkan = !!parseInt(k.hasil_diumumkan);
+
+        const badge = document.getElementById('ps_badge');
+        badge.textContent = diumumkan ? 'Hasil diumumkan' : (<?= json_encode($label) ?>[k.status] || k.status);
+        badge.className = 'text-[10px] font-bold px-2.5 py-1 rounded-full ' + (diumumkan ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-700');
+        document.getElementById('ps_judul').textContent = k.nama_kompetisi;
+
+        const jumlahSekolah = new Set(k.peserta.map(p => p.nama_sekolah)).size;
+        document.getElementById('ps_sub').textContent = k.peserta.length + ' karya • ' + jumlahSekolah + ' sekolah • ' + k.kategori.length + ' kategori';
+        document.getElementById('ps_catatan').textContent = diumumkan ?
+            'Juara ditetapkan dari rata-rata nilai seluruh juri di setiap kategori.' :
+            'Klik judul karya untuk membaca deskripsi lengkapnya.';
+        document.getElementById('ps_cari').value = '';
+
+        // Filter kategori
+        const filter = document.getElementById('ps_filter');
+        filter.innerHTML = '';
+        [{
+            id_kategori: '',
+            nama_kategori: 'Semua kategori'
+        }, ...k.kategori].forEach(kat => {
+            const b = el('button', 'tombol-kat', kat.nama_kategori);
+            b.type = 'button';
+            b.dataset.id = kat.id_kategori;
+            b.onclick = () => {
+                kategoriAktif = String(kat.id_kategori);
+                renderPeserta();
+            };
+            filter.appendChild(b);
+        });
+
+        renderPeserta();
+        openModal('modalPeserta');
+    }
+
+    function renderPeserta() {
+        const k = kompetisiAktif;
+        const diumumkan = !!parseInt(k.hasil_diumumkan);
+        const cari = document.getElementById('ps_cari').value.trim().toLowerCase();
+
+        document.querySelectorAll('.tombol-kat').forEach(b => {
+            const aktif = String(b.dataset.id) === kategoriAktif;
+            b.className = 'tombol-kat px-3 py-1 rounded-full border text-[11px] font-semibold ' +
+                (aktif ? 'bg-brand-600 border-brand-600 text-white' : 'border-slate-300 text-slate-600 hover:bg-slate-50');
+        });
+
+        const cocok = p => !cari || [p.nama_sekolah, p.nama_guru, p.judul_karya].some(t => (t || '').toLowerCase().includes(cari));
+
+        const wadah = document.getElementById('ps_isi');
+        wadah.innerHTML = '';
+        let adaIsi = false;
+
+        k.kategori
+            .filter(kat => !kategoriAktif || String(kat.id_kategori) === kategoriAktif)
+            .forEach(kat => {
+                const daftar = k.peserta.filter(p => String(p.id_kategori) === String(kat.id_kategori) && cocok(p));
+                if (!daftar.length) return;
+                adaIsi = true;
+
+                const bagian = el('div', 'space-y-3');
+                const judul = el('div', 'flex items-center gap-2 font-bold text-slate-700 text-sm');
+                judul.append(el('i', 'fa-solid fa-tag text-indigo-500'), el('span', '', kat.nama_kategori), el('span', 'text-[11px] font-normal text-slate-400', '(' + daftar.length + ' karya)'));
+                bagian.appendChild(judul);
+
+                const juara = diumumkan ? daftar.filter(p => WARNA_JUARA[p.peringkat]) : [];
+                const lainnya = daftar.filter(p => !juara.includes(p));
+
+                // ---------- Kartu juara ----------
+                if (juara.length) {
+                    const grid = el('div', 'grid grid-cols-1 md:grid-cols-3 gap-3');
+                    juara.forEach(p => {
+                        const w = WARNA_JUARA[p.peringkat];
+                        const kartu = el('div', 'border-2 rounded-2xl overflow-hidden shadow-sm ' + w.kartu);
+                        const pita = el('div', 'px-3 py-2 flex justify-between items-center font-bold ' + w.pita);
+                        const kiri = el('span');
+                        kiri.append(el('i', 'fa-solid fa-medal mr-1.5'), document.createTextNode('Juara ' + p.peringkat));
+                        pita.append(kiri, el('span', 'text-sm', angka(p.nilai)));
+
+                        const isi = el('div', 'p-3 space-y-2');
+                        const karya = el('button', 'font-bold text-slate-800 text-left hover:text-brand-600 hover:underline leading-snug', p.judul_karya);
+                        karya.type = 'button';
+                        karya.onclick = () => lihatKarya(p);
+                        const guru = el('div', 'flex gap-2 items-start');
+                        guru.append(el('i', 'fa-solid fa-user text-slate-400 mt-0.5'));
+                        const infoGuru = el('div');
+                        infoGuru.append(el('div', 'font-semibold text-slate-700', p.nama_guru || '-'), el('div', 'text-[10px] text-slate-400', p.mapel || ''));
+                        guru.appendChild(infoGuru);
+                        const sekolah = el('div', 'flex gap-2 items-start');
+                        sekolah.append(el('i', 'fa-solid fa-school text-slate-400 mt-0.5'));
+                        const infoSekolah = el('div');
+                        infoSekolah.append(el('div', 'font-semibold text-slate-700', p.nama_sekolah || '-'), el('div', 'text-[10px] text-slate-400', p.kabupaten_kota || ''));
+                        sekolah.appendChild(infoSekolah);
+
+                        isi.append(karya, guru, sekolah);
+                        kartu.append(pita, isi);
+                        grid.appendChild(kartu);
+                    });
+                    bagian.appendChild(grid);
+                }
+
+                // ---------- Tabel peserta lainnya ----------
+                if (lainnya.length) {
+                    if (juara.length) bagian.appendChild(el('div', 'text-[11px] font-bold text-slate-500 uppercase tracking-wider pt-1', 'Peserta lainnya (' + lainnya.length + ')'));
+                    const kotak = el('div', 'border border-slate-200 rounded-xl overflow-x-auto');
+                    const tabel = el('table', 'w-full text-left text-slate-600');
+                    const kepala = el('thead', 'bg-slate-50 text-[10px] uppercase text-slate-500');
+                    const barisKepala = el('tr');
+                    ['#', 'Karya', 'Guru', 'Sekolah', diumumkan ? 'Nilai' : 'Status'].forEach((t, i) => barisKepala.appendChild(el('th', 'p-2.5 ' + (i === 4 ? 'text-right' : ''), t)));
+                    kepala.appendChild(barisKepala);
+                    const badan = el('tbody', 'divide-y divide-slate-100');
+
+                    lainnya.forEach((p, i) => {
+                        const tr = el('tr', 'hover:bg-slate-50');
+                        tr.appendChild(el('td', 'p-2.5 text-slate-400', String(juara.length + i + 1)));
+
+                        const tdKarya = el('td', 'p-2.5');
+                        const tombolKarya = el('button', 'font-semibold text-slate-800 text-left hover:text-brand-600 hover:underline', p.judul_karya);
+                        tombolKarya.type = 'button';
+                        tombolKarya.onclick = () => lihatKarya(p);
+                        tdKarya.appendChild(tombolKarya);
+                        tr.appendChild(tdKarya);
+
+                        const tdGuru = el('td', 'p-2.5');
+                        tdGuru.append(el('div', 'text-slate-700', p.nama_guru || '-'), el('div', 'text-[10px] text-slate-400', p.mapel || ''));
+                        tr.appendChild(tdGuru);
+
+                        const tdSekolah = el('td', 'p-2.5');
+                        tdSekolah.append(el('div', 'text-slate-700', p.nama_sekolah || '-'), el('div', 'text-[10px] text-slate-400', p.kabupaten_kota || ''));
+                        tr.appendChild(tdSekolah);
+
+                        const tdAkhir = el('td', 'p-2.5 text-right');
+                        if (diumumkan) {
+                            tdAkhir.appendChild(el('span', 'font-bold text-slate-800', angka(p.nilai)));
+                        } else {
+                            const v = VALIDASI[p.status_validasi] || ['-', 'bg-slate-100 text-slate-500'];
+                            tdAkhir.appendChild(el('span', 'text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ' + v[1], v[0]));
+                        }
+                        tr.appendChild(tdAkhir);
+                        badan.appendChild(tr);
+                    });
+
+                    tabel.append(kepala, badan);
+                    kotak.appendChild(tabel);
+                    bagian.appendChild(kotak);
+                }
+
+                wadah.appendChild(bagian);
+            });
+
+        if (!adaIsi) {
+            wadah.appendChild(el('p', 'text-center text-slate-400 py-8', cari ? 'Tidak ada peserta yang cocok dengan pencarian.' : 'Belum ada peserta di kategori ini.'));
+        }
+    }
+
+    function lihatKarya(p) {
+        document.getElementById('ky_judul').textContent = p.judul_karya;
+        document.getElementById('ky_sub').textContent = (p.nama_guru || '-') + ' • ' + (p.nama_sekolah || '-');
+        document.getElementById('ky_deskripsi').textContent = p.deskripsi_karya || 'Belum ada deskripsi.';
+        const video = document.getElementById('ky_video');
+        const aman = /^https?:\/\//i.test(p.link_video || '');
+        video.classList.toggle('hidden', !aman);
+        if (aman) video.href = p.link_video;
+        openModal('modalKarya');
+    }
 </script>
 <?= $this->endSection() ?>
