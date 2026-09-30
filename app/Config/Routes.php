@@ -53,6 +53,7 @@ $routes->post('monev/hapus/(:num)', 'Cmonev::hapus/$1');
 // SUARA
 $routes->get('suara', 'Csuara::index');
 $routes->get('suara/export', 'Csuara::export');
+$routes->post('suara/balas/(:num)', 'Csuara::balas/$1');
 
 // Profil (semua role)
 $routes->get('profil', 'Cprofil::index');

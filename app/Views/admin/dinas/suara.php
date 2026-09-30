@@ -4,6 +4,7 @@
 /** @var array $filter */
 /** @var array $ringkas */
 /** @var array $kategori */
+/** @var array $status */
 /** @var array $kabKota */
 /** @var array $sekolah */
 ?>
@@ -16,6 +17,12 @@ $gaya = [
     'keluhan'    => ['bg-red-50 text-red-700',       'fa-triangle-exclamation', 'text-red-600'],
     'pertanyaan' => ['bg-amber-50 text-amber-800',   'fa-circle-question',   'text-amber-600'],
     'lainnya'    => ['bg-slate-100 text-slate-600',  'fa-comment-dots',      'text-slate-500'],
+];
+
+$gayaStatus = [
+    'belum_ditindak' => 'bg-red-50 text-red-600 border-red-200',
+    'diproses'       => 'bg-amber-50 text-amber-700 border-amber-200',
+    'selesai'        => 'bg-emerald-50 text-emerald-700 border-emerald-200',
 ];
 
 $bulan = [1 => 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -36,6 +43,25 @@ $adaFilter = array_filter($filter);
             <i class="fa-solid fa-file-excel mr-2"></i>Unduh Excel
         </a>
     </div>
+
+    <?php if (session()->getFlashdata('sukses')) : ?>
+        <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-4 py-3 rounded-xl flex items-center">
+            <i class="fa-solid fa-circle-check mr-2"></i><?= session()->getFlashdata('sukses') ?>
+        </div>
+    <?php endif; ?>
+    <?php if (session()->getFlashdata('gagal')) : ?>
+        <div class="bg-red-50 border border-red-200 text-red-700 text-xs px-4 py-3 rounded-xl flex items-center">
+            <i class="fa-solid fa-circle-exclamation mr-2"></i><?= session()->getFlashdata('gagal') ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($ringkas['belum'] > 0 && $filter['status'] !== 'belum_ditindak') : ?>
+        <a href="<?= site_url('suara') . '?' . http_build_query(['status' => 'belum_ditindak'] + $filter) ?>"
+            class="bg-red-50 border border-red-200 text-red-700 text-xs px-4 py-3 rounded-xl flex items-center justify-between hover:bg-red-100 transition">
+            <span><i class="fa-solid fa-bell mr-2"></i><b><?= $ringkas['belum'] ?> SUARA</b> belum dibalas.</span>
+            <span class="font-semibold">Tampilkan <i class="fa-solid fa-arrow-right ml-1"></i></span>
+        </a>
+    <?php endif; ?>
 
     <!-- Ringkasan per kategori (klik untuk menyaring) -->
     <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -64,10 +90,16 @@ $adaFilter = array_filter($filter);
     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
 
         <!-- Filter -->
-        <form method="get" action="<?= site_url('suara') ?>" class="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs">
+        <form method="get" action="<?= site_url('suara') ?>" class="grid grid-cols-1 md:grid-cols-6 gap-3 text-xs">
             <input type="hidden" name="kategori" value="<?= esc($filter['kategori']) ?>">
             <input type="text" name="q" value="<?= esc($filter['q']) ?>" placeholder="Cari isi, nama pengirim, atau sekolah..."
-                class="md:col-span-2 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                class="md:col-span-1 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+            <select name="status" class="border border-slate-300 rounded-lg p-2.5">
+                <option value="">Semua status</option>
+                <?php foreach ($status as $kunci => $teks) : ?>
+                    <option value="<?= $kunci ?>" <?= $filter['status'] === $kunci ? 'selected' : '' ?>><?= esc($teks) ?></option>
+                <?php endforeach; ?>
+            </select>
             <select name="kab" class="border border-slate-300 rounded-lg p-2.5">
                 <option value="">Semua Kab/Kota</option>
                 <?php foreach ($kabKota as $k) : ?>
@@ -75,7 +107,7 @@ $adaFilter = array_filter($filter);
                 <?php endforeach; ?>
             </select>
             <div class="md:col-span-2 flex gap-2">
-                <select name="sekolah" class="flex-1 border border-slate-300 rounded-lg p-2.5">
+                <select name="sekolah" class="flex-1 min-w-0 border border-slate-300 rounded-lg p-2.5">
                     <option value="">Semua Sekolah</option>
                     <?php foreach ($sekolah as $s) : ?>
                         <option value="<?= $s['id_sekolah'] ?>" <?= $filter['sekolah'] == $s['id_sekolah'] ? 'selected' : '' ?>><?= esc($s['nama_sekolah']) ?></option>
@@ -138,6 +170,9 @@ $adaFilter = array_filter($filter);
                                 <?= esc($kategori[$d['kategori']] ?? $d['kategori']) ?>
                             </span>
                             <div class="text-[10px] text-slate-400 whitespace-nowrap"><?= $tgl($d['tanggal_kirim']) ?></div>
+                            <span class="inline-block border text-[10px] font-bold px-2 py-0.5 rounded-full <?= $gayaStatus[$d['status_tindak_lanjut']] ?? '' ?>">
+                                <?= esc($status[$d['status_tindak_lanjut']] ?? '-') ?>
+                            </span>
                         </div>
                     </button>
                 <?php endforeach; ?>
@@ -147,7 +182,7 @@ $adaFilter = array_filter($filter);
 </section>
 
 <!-- =====================================================
-     MODAL DETAIL SUARA (hanya baca)
+     MODAL DETAIL SUARA & BALAS
      ===================================================== -->
 <div id="modalSuara" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl max-h-[90vh] flex flex-col text-xs">
@@ -179,16 +214,49 @@ $adaFilter = array_filter($filter);
                 <div><span class="text-slate-400 w-24 inline-block">Sekolah</span> <span id="s_sekolah"></span></div>
                 <div><span class="text-slate-400 w-24 inline-block">Wilayah</span> <span id="s_kab"></span></div>
             </div>
+
+            <!-- Tanggapan yang sudah dikirim -->
+            <div id="s_balasanWrap" class="hidden">
+                <h4 class="font-bold text-slate-700 mb-2 uppercase tracking-wider text-[11px]">
+                    <i class="fa-solid fa-reply text-emerald-600 mr-1"></i> Tanggapan Dinas
+                </h4>
+                <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
+                    <div id="s_balasan" class="text-slate-700 leading-relaxed whitespace-pre-line"></div>
+                    <div class="text-[10px] text-emerald-700"><i class="fa-solid fa-user-pen mr-1"></i><span id="s_penindak"></span></div>
+                </div>
+            </div>
         </div>
 
-        <div class="flex justify-end border-t p-4 bg-slate-50 rounded-b-2xl">
-            <button type="button" onclick="closeModal('modalSuara')" class="px-4 py-2 border rounded-lg font-semibold text-slate-600 bg-white">Tutup</button>
-        </div>
+        <!-- Form balas -->
+        <form id="s_form" method="post" class="border-t p-5 space-y-3 bg-slate-50 rounded-b-2xl">
+            <?= csrf_field() ?>
+            <label class="font-semibold block text-slate-700"><span id="s_labelForm">Tulis Tanggapan</span></label>
+            <textarea name="tanggapan" id="s_tanggapan" rows="3" maxlength="2000" required
+                placeholder="Tuliskan jawaban atau tindak lanjut dari Dinas..."
+                class="w-full border border-slate-300 rounded-lg p-2.5 bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none"></textarea>
+            <div class="flex flex-wrap justify-between items-center gap-2">
+                <div class="flex items-center gap-3">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="status" value="diproses" id="s_stDiproses" class="accent-amber-500"> Sedang Diproses
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="status" value="selesai" id="s_stSelesai" class="accent-emerald-600"> Selesai
+                    </label>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeModal('modalSuara')" class="px-4 py-2 border rounded-lg font-semibold text-slate-600 bg-white">Tutup</button>
+                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-semibold">
+                        <i class="fa-solid fa-paper-plane mr-1"></i> <span id="s_tombol">Kirim Tanggapan</span>
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 
 <script>
     const LABEL_KATEGORI = <?= json_encode($kategori) ?>;
+    const LABEL_STATUS = <?= json_encode($status) ?>;
     const GAYA_KATEGORI = <?= json_encode(array_map(fn($g) => $g[0], $gaya)) ?>;
 
     function isi(id, teks) {
@@ -225,6 +293,31 @@ $adaFilter = array_filter($filter);
 
         document.getElementById('s_nip_wrap').classList.toggle('hidden', !d.nip);
         isi('s_nip', d.nip);
+
+        // Tanggapan yang sudah ada
+        const sudah = !!d.tanggapan;
+        document.getElementById('s_balasanWrap').classList.toggle('hidden', !sudah);
+        if (sudah) {
+            isi('s_balasan', d.tanggapan);
+            const waktu = d.tanggal_tindak_lanjut ?
+                new Date(d.tanggal_tindak_lanjut.replace(' ', 'T')).toLocaleString('id-ID', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }) :
+                '';
+            isi('s_penindak', (d.nama_penindak || 'Admin Dinas') + (waktu ? ' • ' + waktu : '') +
+                ' • ' + (LABEL_STATUS[d.status_tindak_lanjut] || ''));
+        }
+
+        // Form: kosong untuk balasan baru, terisi untuk perbarui
+        document.getElementById('s_form').action = '<?= site_url('suara/balas') ?>/' + d.id_suara + location.search;
+        document.getElementById('s_tanggapan').value = d.tanggapan || '';
+        document.getElementById('s_labelForm').textContent = sudah ? 'Perbarui Tanggapan' : 'Tulis Tanggapan';
+        document.getElementById('s_tombol').textContent = sudah ? 'Perbarui' : 'Kirim Tanggapan';
+        document.getElementById(d.status_tindak_lanjut === 'diproses' ? 's_stDiproses' : 's_stSelesai').checked = true;
 
         openModal('modalSuara');
     }

@@ -11,8 +11,13 @@ class Csuara extends BaseController
         'lainnya'    => 'Lainnya',
     ];
 
-    // Sementara halaman ini khusus Admin Dinas (lihat data saja).
-    // Versi Admin Sekolah (tanpa identitas pengirim) ditambahkan nanti.
+    public const STATUS = [
+        'belum_ditindak' => 'Belum Dibalas',
+        'diproses'       => 'Sedang Diproses',
+        'selesai'        => 'Selesai',
+    ];
+
+    // Rekap, balas, dan unduh khusus Admin Dinas
     private function bolehAkses(): bool
     {
         return session()->get('logged_in') && session()->get('role') === 'admin_pusat';
@@ -25,6 +30,7 @@ class Csuara extends BaseController
             'kategori' => (string) $this->request->getGet('kategori'),
             'kab'      => (string) $this->request->getGet('kab'),
             'sekolah'  => (string) $this->request->getGet('sekolah'),
+            'status'   => (string) $this->request->getGet('status'),
         ];
     }
 
@@ -34,10 +40,13 @@ class Csuara extends BaseController
         $builder = \Config\Database::connect()->table('suara sr')
             ->select('sr.id_suara, sr.kategori, sr.isi_suara, sr.tanggal_kirim,
                       sr.nama_pengirim, sr.email_pengirim,
+                      sr.status_tindak_lanjut, sr.tanggapan, sr.tanggal_tindak_lanjut,
                       g.nama_guru, g.nip, ap.nama_admin AS nama_admin_pengirim,
+                      pd.nama_admin AS nama_penindak,
                       s.nama_sekolah, s.npsn, s.kabupaten_kota')
             ->join('guru g', 'g.id_guru = sr.id_guru', 'left')
             ->join('admin ap', 'ap.id_admin = sr.id_admin_pengirim', 'left')
+            ->join('admin pd', 'pd.id_admin = sr.id_admin_penindak', 'left')
             ->join('sekolah s', 's.id_sekolah = sr.id_sekolah', 'left');
 
         if ($filter['q'] !== '') {
@@ -56,6 +65,9 @@ class Csuara extends BaseController
         }
         if ($filter['sekolah'] !== '') {
             $builder->where('sr.id_sekolah', $filter['sekolah']);
+        }
+        if (array_key_exists($filter['status'], self::STATUS)) {
+            $builder->where('sr.status_tindak_lanjut', $filter['status']);
         }
 
         $data = $builder->orderBy('sr.tanggal_kirim', 'DESC')->get()->getResultArray();
@@ -103,7 +115,8 @@ class Csuara extends BaseController
     private function indexSekolah()
     {
         $riwayat = \Config\Database::connect()->table('suara sr')
-            ->select('sr.id_suara, sr.kategori, sr.isi_suara, sr.tanggal_kirim, a.nama_admin AS pengirim')
+            ->select('sr.id_suara, sr.kategori, sr.isi_suara, sr.tanggal_kirim, a.nama_admin AS pengirim,
+                      sr.status_tindak_lanjut, sr.tanggapan, sr.tanggal_tindak_lanjut')
             ->join('admin a', 'a.id_admin = sr.id_admin_pengirim')
             ->where('sr.id_sekolah', session()->get('id_sekolah'))
             ->where('sr.id_admin_pengirim IS NOT NULL')
@@ -113,6 +126,7 @@ class Csuara extends BaseController
         return view('admin/sekolah/suara', [
             'riwayat'  => $riwayat,
             'kategori' => self::KATEGORI,
+            'status'   => self::STATUS,
         ]);
     }
 
@@ -174,16 +188,56 @@ class Csuara extends BaseController
         foreach (array_keys(self::KATEGORI) as $k) {
             $ringkas[$k] = $db->table('suara')->where('kategori', $k)->countAllResults();
         }
+        $ringkas['belum'] = $db->table('suara')->where('status_tindak_lanjut', 'belum_ditindak')->countAllResults();
 
         return view('admin/dinas/suara', [
             'suara'    => $this->querySuara($filter),
             'filter'   => $filter,
             'ringkas'  => $ringkas,
             'kategori' => self::KATEGORI,
+            'status'   => self::STATUS,
             'kabKota'  => Csekolah::KAB_KOTA,
             'sekolah'  => $db->table('sekolah')->select('id_sekolah, nama_sekolah')
                 ->orderBy('nama_sekolah', 'ASC')->get()->getResultArray(),
         ]);
+    }
+
+    // =====================================================
+    // BALAS / PERBARUI TANGGAPAN (Admin Dinas)
+    // =====================================================
+    public function balas($id)
+    {
+        if (! $this->bolehAkses()) {
+            return redirect()->to('dashboard');
+        }
+
+        $db    = \Config\Database::connect();
+        $suara = $db->table('suara')->where('id_suara', $id)->get()->getRowArray();
+        if (! $suara) {
+            return redirect()->to('suara')->with('gagal', 'SUARA tidak ditemukan.');
+        }
+
+        $tanggapan = trim((string) $this->request->getPost('tanggapan'));
+        $status    = (string) $this->request->getPost('status');
+
+        if (! in_array($status, ['diproses', 'selesai'], true)) {
+            $status = 'selesai';
+        }
+        if (mb_strlen($tanggapan) < 5 || mb_strlen($tanggapan) > 2000) {
+            return redirect()->to(site_url('suara') . '?' . http_build_query($this->request->getGet()))
+                ->with('gagal', 'Tanggapan wajib diisi (5 sampai 2000 karakter).');
+        }
+
+        $db->table('suara')->where('id_suara', $id)->update([
+            'tanggapan'             => $tanggapan,
+            'status_tindak_lanjut'  => $status,
+            'id_admin_penindak'     => session()->get('user_id'),
+            'tanggal_tindak_lanjut' => date('Y-m-d H:i:s'),
+        ]);
+
+        // Kembali ke halaman dengan filter yang sama
+        return redirect()->to(site_url('suara') . '?' . http_build_query($this->request->getGet()))
+            ->with('sukses', 'Tanggapan berhasil ' . ($suara['tanggapan'] ? 'diperbarui' : 'dikirim') . '.');
     }
 
     // =====================================================
@@ -199,7 +253,7 @@ class Csuara extends BaseController
 
         $file = fopen('php://temp', 'r+');
         fwrite($file, "\xEF\xBB\xBF");
-        fputcsv($file, ['No', 'Tanggal', 'Kategori', 'Pengirim', 'Jenis Pengirim', 'Email', 'Sekolah', 'Kabupaten/Kota', 'Isi SUARA'], ';');
+        fputcsv($file, ['No', 'Tanggal', 'Kategori', 'Pengirim', 'Jenis Pengirim', 'Email', 'Sekolah', 'Kabupaten/Kota', 'Isi SUARA', 'Status', 'Tanggapan Dinas', 'Dibalas Oleh', 'Tanggal Dibalas'], ';');
 
         foreach ($data as $i => $d) {
             fputcsv($file, [
@@ -212,6 +266,10 @@ class Csuara extends BaseController
                 $d['nama_sekolah'] ?? '-',
                 $d['kabupaten_kota'] ?? '-',
                 $d['isi_suara'],
+                self::STATUS[$d['status_tindak_lanjut']] ?? '-',
+                $d['tanggapan'] ?: '-',
+                $d['nama_penindak'] ?: '-',
+                $d['tanggal_tindak_lanjut'] ? date('d/m/Y H:i', strtotime($d['tanggal_tindak_lanjut'])) : '-',
             ], ';');
         }
 
