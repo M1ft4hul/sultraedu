@@ -35,9 +35,9 @@ $warna = $warnaRole[$role] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/3
                 <img src="<?= base_url('dashboard/Pemprov Sultra.png') ?>" alt="" width="80px">
             </div>
             <div>
-                <h1><strong>EDUVATION</strong></h1>
-                <h1 class="text-sm font-bold leading-tight tracking-wide">Dinas Pendidikan & Kebudayaan Provinsi Sulawesi Tenggara</h1>
-                <p class="text-xs text-slate-400">Ekosistem Inovasi & Praktik Baik Pendidikan Daerah</p>
+                <h1 class="text-xl"><strong>SULTRA EDUVATION</strong></h1>
+                <!-- <h1 class="text-sm font-bold leading-tight tracking-wide"> EDUVATION</h1> -->
+                <p class="text-lg text-slate-400">Ekosistem Inovasi & Praktik Baik Pendidikan Daerah</p>
             </div>
         </div>
 
