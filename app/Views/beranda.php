@@ -29,7 +29,7 @@
                                     <div data-depth="0.2"><span class="icon-four"></span></div>
                                 </div>
                             </div>
-                            <img src="<?php echo base_url() ?>assets/images/education/banner-artwork.png" alt="artwork" />
+                            <img src="<?php echo base_url() ?>assets/images/education/download.png" alt="artwork" />
                             <div class="parallax-scene front">
                                 <div id="scene2">
                                     <div data-depth="0.1"><span class="icon-two"></span></div>
