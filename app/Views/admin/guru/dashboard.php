@@ -59,7 +59,7 @@ $kartu = [
         </div>
         <div class="flex flex-wrap gap-2">
             <a href="<?= site_url('praktik-baik') ?>" class="bg-white text-slate-900 hover:bg-slate-100 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center">
-                <i class="fa-solid fa-book-open mr-2 text-brand-600"></i>Ajukan Praktik Baik
+                <i class="fa-solid fa-book-open mr-2 text-brand-600"></i>Unggah Praktik Baik
             </a>
             <a href="<?= site_url('bank-inovasi') ?>" class="bg-amber-400 hover:bg-amber-500 text-slate-900 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center">
                 <i class="fa-solid fa-lightbulb mr-2"></i>Usulkan Inovasi

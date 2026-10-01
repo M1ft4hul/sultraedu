@@ -61,7 +61,7 @@ $gayaLangkah = [
         </div>
         <button type="button" onclick="bukaForm()"
             class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow flex items-center">
-            <i class="fa-solid fa-plus mr-2"></i>Ajukan Praktik Baik
+            <i class="fa-solid fa-plus mr-2"></i>Unggah Praktik Baik
         </button>
     </div>
 
@@ -186,7 +186,7 @@ $gayaLangkah = [
         <input type="hidden" name="id_praktik_baik" id="f_id">
 
         <div class="flex justify-between items-center border-b p-5">
-            <h3 class="font-bold text-slate-800 text-base"><i class="fa-solid fa-book-open text-brand-600 mr-2"></i><span id="f_judulForm">Ajukan Praktik Baik</span></h3>
+            <h3 class="font-bold text-slate-800 text-base"><i class="fa-solid fa-book-open text-brand-600 mr-2"></i><span id="f_judulForm">Praktik Baik</span></h3>
             <button type="button" onclick="closeModal('modalForm')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
         </div>
 
@@ -400,7 +400,7 @@ $gayaLangkah = [
         }
         sel.value = d?.kategori || '';
 
-        document.getElementById('f_judulForm').textContent = revisi ? 'Perbaiki & Kirim Ulang' : (edit ? 'Edit Praktik Baik' : 'Ajukan Praktik Baik');
+        document.getElementById('f_judulForm').textContent = revisi ? 'Perbaiki & Kirim Ulang' : (edit ? 'Edit Praktik Baik' : 'Praktik Baik');
         document.getElementById('f_tombolTeks').textContent = revisi ? 'Kirim Ulang' : (edit ? 'Simpan Perubahan' : 'Ajukan');
 
         // Catatan penolakan & tanggapan
