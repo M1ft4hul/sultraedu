@@ -1,16 +1,18 @@
 <?php
-
 /** @var array $inovasi */
 /** @var string $tab */
 /** @var array $jumlah */
 /** @var array $praktik */
+/** @var array $jenisFile */
+/** @var array $jenisTautan */
+/** @var array $ekstensi */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
 <?= $this->section('content') ?>
 <?php
 $bulan = [1 => 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-$tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', strtotime($d))] . ' ' . date('Y', strtotime($d)) : '-';
+$tgl   = fn ($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', strtotime($d))] . ' ' . date('Y', strtotime($d)) : '-';
 
 $tahap = [
     'tunggu_sekolah' => ['Menunggu verifikasi sekolah', 'bg-amber-100 text-amber-800'],
@@ -119,7 +121,11 @@ $gayaLangkah = [
                                 <?php endif; ?>
                             </div>
                             <h3 class="font-bold text-slate-800 text-sm mt-2"><?= esc($p['judul_inovasi']) ?></h3>
-                            <p class="text-[11px] text-slate-400">Diusulkan <?= $tgl($p['created_at']) ?> • <?= count($p['lampiran']) ?> lampiran dari praktik baik asal</p>
+                            <?php
+                            $lampInovasi = count(array_filter($p['lampiran'], fn ($l) => $l['sumber'] === 'inovasi'));
+                            $lampPraktik = count($p['lampiran']) - $lampInovasi;
+                            ?>
+                            <p class="text-[11px] text-slate-400">Diusulkan <?= $tgl($p['created_at']) ?> • <?= $lampInovasi ?> lampiran inovasi<?= $lampPraktik ? ' + ' . $lampPraktik . ' dari praktik baik' : '' ?></p>
                         </div>
 
                         <div class="flex gap-1.5 shrink-0">
@@ -177,7 +183,7 @@ $gayaLangkah = [
      MODAL FORM USULKAN / EDIT / PERBAIKI
      ===================================================== -->
 <div id="modalForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <form action="<?= site_url('bank-inovasi/simpan') ?>" method="post"
+    <form action="<?= site_url('bank-inovasi/simpan') ?>" method="post" enctype="multipart/form-data"
         class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl max-h-[92vh] flex flex-col text-xs">
         <?= csrf_field() ?>
         <input type="hidden" name="id_inovasi" id="f_id">
@@ -208,7 +214,7 @@ $gayaLangkah = [
                 <p class="text-[10px] text-slate-400 mt-1">
                     <?= empty($praktik)
                         ? 'Belum ada praktik baik Anda yang disetujui Dinas. Inovasi tetap bisa diusulkan tanpa praktik baik asal.'
-                        : 'Hanya praktik baik yang sudah disetujui Dinas. Lampirannya otomatis menjadi lampiran inovasi ini.' ?>
+                        : 'Hanya praktik baik yang sudah disetujui Dinas. Lampirannya ikut ditampilkan sebagai lampiran pendukung.' ?>
                 </p>
             </div>
             <div>
@@ -216,6 +222,27 @@ $gayaLangkah = [
                 <textarea name="deskripsi" id="f_deskripsi" rows="7" required minlength="30"
                     placeholder="Jelaskan masalah yang diselesaikan, apa yang baru dari inovasi ini, cara menerapkannya, dan dampaknya..."
                     class="w-full border border-slate-300 rounded-lg p-2.5"></textarea>
+            </div>
+
+            <!-- Lampiran inovasi tersimpan -->
+            <div id="f_lamaWrap" class="hidden">
+                <label class="font-semibold block mb-1 text-slate-700">Lampiran Inovasi Tersimpan</label>
+                <p class="text-[10px] text-slate-400 mb-2">Centang lampiran yang ingin dihapus. Lampiran dari praktik baik asal tidak terpengaruh.</p>
+                <div id="f_lama" class="space-y-1.5"></div>
+            </div>
+
+            <!-- Lampiran inovasi baru -->
+            <div class="border border-dashed border-slate-300 rounded-xl p-4 space-y-3">
+                <div class="flex flex-wrap justify-between items-center gap-2">
+                    <label class="font-semibold text-slate-700"><i class="fa-solid fa-paperclip mr-1"></i>Lampiran Inovasi</label>
+                    <div class="flex gap-3">
+                        <button type="button" onclick="tambahBarisFile()" class="text-[11px] text-brand-600 font-semibold hover:underline"><i class="fa-solid fa-upload mr-0.5"></i>File</button>
+                        <button type="button" onclick="tambahBarisTautan()" class="text-[11px] text-brand-600 font-semibold hover:underline"><i class="fa-solid fa-link mr-0.5"></i>Tautan</button>
+                    </div>
+                </div>
+                <div id="f_barisFile" class="space-y-2"></div>
+                <div id="f_barisTautan" class="space-y-2"></div>
+                <p class="text-[10px] text-slate-400">Bukti pendukung khusus inovasi ini (foto, dokumen, data hasil, video). File: <?= strtoupper(implode(', ', $ekstensi)) ?>, maksimal 5 MB per file.</p>
             </div>
 
             <div id="f_revisiWrap" class="hidden">
@@ -260,7 +287,7 @@ $gayaLangkah = [
                 <b id="d_praktik" class="text-blue-800"></b>
             </div>
             <div>
-                <h4 class="font-bold text-slate-700 mb-2 uppercase tracking-wider text-[11px]"><i class="fa-solid fa-paperclip text-slate-500 mr-1"></i> Lampiran (dari praktik baik asal)</h4>
+                <h4 class="font-bold text-slate-700 mb-2 uppercase tracking-wider text-[11px]"><i class="fa-solid fa-paperclip text-slate-500 mr-1"></i> Lampiran</h4>
                 <div id="d_lampiran" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div>
             </div>
             <div id="d_revisiWrap" class="hidden">
@@ -302,8 +329,11 @@ $gayaLangkah = [
 </div>
 
 <script>
-    const LABEL_TAHAP = <?= json_encode(array_map(fn($x) => $x[0], $tahap)) ?>;
-    const GAYA_TAHAP = <?= json_encode(array_map(fn($x) => $x[1], $tahap)) ?>;
+    const JENIS_FILE   = <?= json_encode($jenisFile) ?>;
+    const JENIS_TAUTAN = <?= json_encode($jenisTautan) ?>;
+    const TERIMA_FILE  = '<?= implode(',', array_map(fn ($e) => '.' . $e, $ekstensi)) ?>';
+    const LABEL_TAHAP = <?= json_encode(array_map(fn ($x) => $x[0], $tahap)) ?>;
+    const GAYA_TAHAP  = <?= json_encode(array_map(fn ($x) => $x[1], $tahap)) ?>;
 
     const buat = (tag, kelas, teks) => {
         const el = document.createElement(tag);
@@ -311,11 +341,52 @@ $gayaLangkah = [
         if (teks !== undefined) el.textContent = teks;
         return el;
     };
-    const formatTanggal = t => t ? new Date(t.replace(' ', 'T')).toLocaleDateString('id-ID', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric'
-    }) : '-';
+    const formatTanggal = t => t ? new Date(t.replace(' ', 'T')).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-';
+
+    // ---------- Baris lampiran ----------
+    const pilihan = (nama, opsi) => {
+        const sel = buat('select', 'border border-slate-300 rounded-lg p-2 text-xs');
+        sel.name = nama;
+        Object.entries(opsi).forEach(([nilai, label]) => {
+            const o = buat('option', '', label);
+            o.value = nilai;
+            sel.appendChild(o);
+        });
+        return sel;
+    };
+    const tombolHapusBaris = baris => {
+        const b = buat('button', 'w-8 border border-slate-200 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 shrink-0');
+        b.type = 'button';
+        b.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        b.onclick = () => baris.remove();
+        return b;
+    };
+
+    function tambahBarisFile() {
+        const baris = buat('div', 'flex flex-wrap md:flex-nowrap gap-2');
+        const file = buat('input', 'flex-1 min-w-0 border border-slate-300 rounded-lg p-1.5 text-xs file:mr-2 file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:rounded');
+        file.type = 'file';
+        file.name = 'file_lampiran[]';
+        file.accept = TERIMA_FILE;
+        const ket = buat('input', 'flex-1 min-w-0 border border-slate-300 rounded-lg p-2 text-xs');
+        ket.name = 'keterangan_file[]';
+        ket.placeholder = 'Keterangan (opsional)';
+        baris.append(pilihan('jenis_file[]', JENIS_FILE), file, ket, tombolHapusBaris(baris));
+        document.getElementById('f_barisFile').appendChild(baris);
+    }
+
+    function tambahBarisTautan() {
+        const baris = buat('div', 'flex flex-wrap md:flex-nowrap gap-2');
+        const url = buat('input', 'flex-1 min-w-0 border border-slate-300 rounded-lg p-2 text-xs');
+        url.type = 'url';
+        url.name = 'url_tautan[]';
+        url.placeholder = 'https://...';
+        const ket = buat('input', 'flex-1 min-w-0 border border-slate-300 rounded-lg p-2 text-xs');
+        ket.name = 'keterangan_tautan[]';
+        ket.placeholder = 'Keterangan (opsional)';
+        baris.append(pilihan('jenis_tautan[]', JENIS_TAUTAN), url, ket, tombolHapusBaris(baris));
+        document.getElementById('f_barisTautan').appendChild(baris);
+    }
 
     // ---------- Form usulkan / edit / perbaiki ----------
     function bukaForm(d = null) {
@@ -349,6 +420,27 @@ $gayaLangkah = [
             document.getElementById('f_catatan').textContent = (d.tahap === 'tolak_sekolah' ? d.catatan_sekolah : d.catatan_verifikasi) || '-';
         }
 
+        // Lampiran inovasi yang sudah tersimpan (bukan dari praktik baik asal)
+        const lama = document.getElementById('f_lama');
+        lama.innerHTML = '';
+        const milik = edit ? (d.lampiran || []).filter(f => f.sumber === 'inovasi') : [];
+        document.getElementById('f_lamaWrap').classList.toggle('hidden', !milik.length);
+        milik.forEach(f => {
+            const label = buat('label', 'flex items-center gap-2 border rounded-lg p-2 cursor-pointer hover:bg-red-50');
+            const cek = buat('input', 'accent-red-600');
+            cek.type = 'checkbox';
+            cek.name = 'hapus_lampiran[]';
+            cek.value = f.id_dokumen;
+            label.append(cek,
+                buat('span', 'flex-1 truncate text-slate-700', f.nama_file || 'Dokumen'),
+                buat('span', 'text-[10px] text-slate-400 capitalize', (f.jenis_dokumen || '').replaceAll('_', ' ')));
+            lama.appendChild(label);
+        });
+
+        document.getElementById('f_barisFile').innerHTML = '';
+        document.getElementById('f_barisTautan').innerHTML = '';
+        if (!edit) tambahBarisFile();
+
         openModal('modalForm');
     }
 
@@ -356,11 +448,11 @@ $gayaLangkah = [
     function kotak(id, warna, judul, isiBaris) {
         const el = document.getElementById(id);
         const gaya = {
-            hijau: ['border-emerald-400 bg-emerald-50/50', 'text-emerald-800'],
-            merah: ['border-red-400 bg-red-50/50', 'text-red-700'],
+            hijau:  ['border-emerald-400 bg-emerald-50/50', 'text-emerald-800'],
+            merah:  ['border-red-400 bg-red-50/50', 'text-red-700'],
             kuning: ['border-amber-400 bg-amber-50/50', 'text-amber-800'],
-            abu: ['border-slate-300 bg-slate-50', 'text-slate-500'],
-        } [warna];
+            abu:    ['border-slate-300 bg-slate-50', 'text-slate-500'],
+        }[warna];
         el.className = 'border-l-4 rounded-r-xl p-3.5 space-y-1 ' + gaya[0];
         el.innerHTML = '';
         el.appendChild(buat('div', 'font-bold ' + gaya[1], judul));
@@ -385,21 +477,12 @@ $gayaLangkah = [
         const wadah = document.getElementById('d_lampiran');
         wadah.innerHTML = '';
         if (!d.lampiran || !d.lampiran.length) {
-            wadah.appendChild(buat('p', 'text-slate-400 italic', 'Tidak ada lampiran (inovasi tanpa praktik baik asal).'));
+            wadah.appendChild(buat('p', 'text-slate-400 italic', 'Tidak ada lampiran.'));
         } else {
-            const ikon = {
-                foto: 'fa-image',
-                video: 'fa-video',
-                tautan_publikasi: 'fa-link',
-                penghargaan: 'fa-award'
-            };
+            const ikon = { foto: 'fa-image', video: 'fa-video', tautan_publikasi: 'fa-link', penghargaan: 'fa-award' };
             d.lampiran.forEach(f => {
                 const a = buat(f.url ? 'a' : 'div', 'flex items-center gap-3 border rounded-lg p-2.5 hover:bg-slate-50');
-                if (f.url) {
-                    a.href = f.url;
-                    a.target = '_blank';
-                    a.rel = 'noopener';
-                }
+                if (f.url) { a.href = f.url; a.target = '_blank'; a.rel = 'noopener'; }
                 a.appendChild(buat('i', 'fa-solid ' + (ikon[f.jenis_dokumen] || 'fa-file-lines') + ' text-slate-400 text-base w-5 text-center'));
                 const teks = buat('div', 'min-w-0');
                 teks.append(
@@ -407,6 +490,9 @@ $gayaLangkah = [
                     buat('div', 'text-[10px] text-slate-400 capitalize', (f.jenis_dokumen || '').replaceAll('_', ' ') + (f.keterangan ? ' • ' + f.keterangan : ''))
                 );
                 a.appendChild(teks);
+                a.appendChild(buat('span', 'ml-auto shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full ' +
+                    (f.sumber === 'praktik' ? 'bg-blue-50 text-blue-700' : 'bg-indigo-50 text-indigo-700'),
+                    f.sumber === 'praktik' ? 'Praktik baik' : 'Inovasi'));
                 wadah.appendChild(a);
             });
         }
@@ -425,9 +511,7 @@ $gayaLangkah = [
             kotak('d_t1', 'kuning', 'Tahap 1 — Menunggu verifikasi Admin Sekolah', []);
         } else {
             kotak('d_t1', st1 === 'disetujui' ? 'hijau' : 'merah', 'Tahap 1 — ' + (st1 === 'disetujui' ? 'Disetujui' : 'Ditolak') + ' Admin Sekolah', [
-                ['Oleh', d.verifikator_sekolah],
-                ['Tanggal', formatTanggal(d.tanggal_verifikasi_sekolah)],
-                ['Catatan', d.catatan_sekolah],
+                ['Oleh', d.verifikator_sekolah], ['Tanggal', formatTanggal(d.tanggal_verifikasi_sekolah)], ['Catatan', d.catatan_sekolah],
             ]);
         }
 
@@ -438,9 +522,7 @@ $gayaLangkah = [
             kotak('d_t2', 'kuning', 'Tahap 2 — Menunggu validasi Dinas', []);
         } else {
             kotak('d_t2', st2 === 'disetujui' ? 'hijau' : 'merah', 'Tahap 2 — ' + (st2 === 'disetujui' ? 'Disetujui Dinas (masuk Bank Inovasi)' : 'Ditolak Dinas'), [
-                ['Oleh', d.nama_verifikator],
-                ['Tanggal', formatTanggal(d.tanggal_verifikasi)],
-                ['Catatan', d.catatan_verifikasi],
+                ['Oleh', d.nama_verifikator], ['Tanggal', formatTanggal(d.tanggal_verifikasi)], ['Catatan', d.catatan_verifikasi],
             ]);
         }
 

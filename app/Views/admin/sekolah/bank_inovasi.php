@@ -1,5 +1,4 @@
 <?php
-
 /** @var array $inovasi */
 /** @var string $status */
 /** @var array $jumlah */
@@ -221,11 +220,7 @@ $tabs = ['' => 'Semua'] + $label;
 
     function formatTanggal(t) {
         if (!t) return '-';
-        return new Date(t.replace(' ', 'T')).toLocaleDateString('id-ID', {
-            day: '2-digit',
-            month: 'long',
-            year: 'numeric'
-        });
+        return new Date(t.replace(' ', 'T')).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
     }
 
     function isi(id, teks) {
@@ -233,11 +228,9 @@ $tabs = ['' => 'Semua'] + $label;
     }
 
     function kotakRiwayat(prefix, status, judulSetuju, judulTolak, judulTunggu) {
-        const warna = {
-            disetujui: ['border-emerald-400 bg-emerald-50/50', 'text-emerald-800', judulSetuju],
-            ditolak: ['border-red-400 bg-red-50/50', 'text-red-700', judulTolak],
-            menunggu: ['border-amber-400 bg-amber-50/50', 'text-amber-800', judulTunggu]
-        } [status];
+        const warna = { disetujui: ['border-emerald-400 bg-emerald-50/50', 'text-emerald-800', judulSetuju],
+                        ditolak:   ['border-red-400 bg-red-50/50', 'text-red-700', judulTolak],
+                        menunggu:  ['border-amber-400 bg-amber-50/50', 'text-amber-800', judulTunggu] }[status];
         document.getElementById(prefix).className = 'border-l-4 rounded-r-xl p-3.5 space-y-1 ' + warna[0];
         const judul = document.getElementById(prefix + '_judul');
         judul.className = 'font-bold ' + warna[1];
@@ -267,18 +260,10 @@ $tabs = ['' => 'Semua'] + $label;
         if (!d.lampiran || d.lampiran.length === 0) {
             wadah.innerHTML = '<p class="text-slate-400 italic">Tidak ada lampiran.</p>';
         } else {
-            const ikon = {
-                foto: 'fa-image',
-                video: 'fa-video',
-                tautan_publikasi: 'fa-link',
-                penghargaan: 'fa-award'
-            };
+            const ikon = { foto: 'fa-image', video: 'fa-video', tautan_publikasi: 'fa-link', penghargaan: 'fa-award' };
             d.lampiran.forEach(f => {
                 const a = document.createElement(f.url ? 'a' : 'div');
-                if (f.url) {
-                    a.href = f.url;
-                    a.target = '_blank';
-                }
+                if (f.url) { a.href = f.url; a.target = '_blank'; }
                 a.className = 'flex items-center gap-3 border rounded-lg p-2.5 hover:bg-slate-50';
                 const i = document.createElement('i');
                 i.className = 'fa-solid ' + (ikon[f.jenis_dokumen] || 'fa-file-lines') + ' text-slate-400 text-base w-5 text-center';
@@ -292,6 +277,11 @@ $tabs = ['' => 'Semua'] + $label;
                 jenis.textContent = (f.jenis_dokumen || '').replaceAll('_', ' ') + (f.keterangan ? ' • ' + f.keterangan : '');
                 teks.append(nama, jenis);
                 a.append(i, teks);
+                const sumber = document.createElement('span');
+                sumber.className = 'ml-auto shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full ' +
+                    (f.sumber === 'praktik' ? 'bg-blue-50 text-blue-700' : 'bg-indigo-50 text-indigo-700');
+                sumber.textContent = f.sumber === 'praktik' ? 'Praktik baik' : 'Inovasi';
+                a.appendChild(sumber);
                 wadah.appendChild(a);
             });
         }

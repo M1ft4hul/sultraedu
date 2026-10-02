@@ -10,23 +10,6 @@ class CbankInovasi extends BaseController
         'ditolak'   => 'Ditolak',
     ];
 
-    // Lampiran inovasi: jenis & aturan sama dengan praktik baik
-    public const JENIS_FILE = [
-        'foto'            => 'Foto Kegiatan',
-        'dokumen_program' => 'Dokumen Program',
-        'data_hasil'      => 'Data Hasil',
-        'bukti_perubahan' => 'Bukti Perubahan',
-        'penghargaan'     => 'Penghargaan',
-        'dokumen_lain'    => 'Dokumen Lain',
-    ];
-    public const JENIS_TAUTAN = [
-        'video'            => 'Video',
-        'tautan_publikasi' => 'Tautan Publikasi',
-    ];
-    private const EKSTENSI = ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
-    private const MAKS_KB  = 5120; // 5 MB per file
-    private const FOLDER   = 'uploads/bank_inovasi/';
-
     // =====================================================
     // PINTU MASUK: pilih halaman sesuai role
     // =====================================================
@@ -75,48 +58,27 @@ class CbankInovasi extends BaseController
             ->join('admin a', 'a.id_admin = bi.id_verifikator', 'left');
     }
 
-    // Alamat lampiran: tautan luar dipakai apa adanya
-    private static function urlLampiran(?string $path): ?string
-    {
-        if (! $path) {
-            return null;
-        }
-
-        return preg_match('#^https?://#i', $path) ? $path : base_url($path);
-    }
-
-    // Lampiran dari dua sumber: unggahan inovasi sendiri + praktik baik asal
+    // Lampiran dari praktik baik asal (sekali query untuk semua baris)
     private function tempelLampiran($db, array $inovasi): array
     {
-        $idInovasi = array_filter(array_column($inovasi, 'id_inovasi'));
         $idPraktik = array_filter(array_unique(array_column($inovasi, 'id_praktik_baik')));
-        $milik     = [];
-        $asal      = [];
-
-        if ($idInovasi) {
-            foreach ($db->table('bank_inovasi_dokumen')
-                ->select('id_dokumen, id_inovasi, jenis_dokumen, nama_file, path_file, keterangan')
-                ->whereIn('id_inovasi', $idInovasi)->orderBy('id_dokumen', 'ASC')
-                ->get()->getResultArray() as $d) {
-                $d['url']    = self::urlLampiran($d['path_file']);
-                $d['sumber'] = 'inovasi';
-                $milik[$d['id_inovasi']][] = $d;
-            }
-        }
+        $lampiran  = [];
 
         if ($idPraktik) {
-            foreach ($db->table('praktik_baik_dokumen')
-                ->select('id_dokumen, id_praktik_baik, jenis_dokumen, nama_file, path_file, keterangan')
+            $dokumen = $db->table('praktik_baik_dokumen')
+                ->select('id_praktik_baik, jenis_dokumen, nama_file, path_file, keterangan')
                 ->whereIn('id_praktik_baik', $idPraktik)
-                ->get()->getResultArray() as $d) {
-                $d['url']    = self::urlLampiran($d['path_file']);
-                $d['sumber'] = 'praktik';
-                $asal[$d['id_praktik_baik']][] = $d;
+                ->get()->getResultArray();
+
+            foreach ($dokumen as $d) {
+                $d['url'] = ! $d['path_file'] ? null
+                    : (preg_match('#^https?://#i', $d['path_file']) ? $d['path_file'] : base_url($d['path_file']));
+                $lampiran[$d['id_praktik_baik']][] = $d;
             }
         }
 
         foreach ($inovasi as &$i) {
-            $i['lampiran'] = array_merge($milik[$i['id_inovasi']] ?? [], $asal[$i['id_praktik_baik']] ?? []);
+            $i['lampiran'] = $lampiran[$i['id_praktik_baik']] ?? [];
         }
         unset($i);
 
@@ -254,7 +216,7 @@ class CbankInovasi extends BaseController
         unset($i);
 
         if (isset($kelompok[$tab])) {
-            $inovasi = array_values(array_filter($inovasi, fn ($i) => in_array($i['tahap'], $kelompok[$tab], true)));
+            $inovasi = array_values(array_filter($inovasi, fn($i) => in_array($i['tahap'], $kelompok[$tab], true)));
         } else {
             $tab = '';
         }
@@ -269,13 +231,10 @@ class CbankInovasi extends BaseController
             ->get()->getResultArray();
 
         return view('admin/guru/bank_inovasi', [
-            'inovasi'     => $this->tempelLampiran($db, $inovasi),
-            'tab'         => $tab,
-            'jumlah'      => $jumlah,
-            'praktik'     => $praktik,
-            'jenisFile'   => self::JENIS_FILE,
-            'jenisTautan' => self::JENIS_TAUTAN,
-            'ekstensi'    => self::EKSTENSI,
+            'inovasi' => $this->tempelLampiran($db, $inovasi),
+            'tab'     => $tab,
+            'jumlah'  => $jumlah,
+            'praktik' => $praktik,
         ]);
     }
 
@@ -341,58 +300,12 @@ class CbankInovasi extends BaseController
             }
         }
 
-        // ---------- Lampiran file ----------
-        $semuaFile = $this->request->getFiles()['file_lampiran'] ?? [];
-        $jenisFile = (array) $this->request->getPost('jenis_file');
-        $ketFile   = (array) $this->request->getPost('keterangan_file');
-        $fileBaru  = [];
-        foreach ($semuaFile as $i => $file) {
-            if (! $file || $file->getError() === UPLOAD_ERR_NO_FILE) {
-                continue;
-            }
-            $nama = $file->getClientName();
-            if (! $file->isValid()) {
-                $error[] = 'File "' . $nama . '" gagal diunggah.';
-            } elseif (! in_array(strtolower($file->getClientExtension()), self::EKSTENSI, true)) {
-                $error[] = 'Format file "' . $nama . '" tidak didukung.';
-            } elseif ($file->getSizeByUnit('kb') > self::MAKS_KB) {
-                $error[] = 'File "' . $nama . '" melebihi 5 MB.';
-            } else {
-                $fileBaru[] = [
-                    'file'  => $file,
-                    'jenis' => array_key_exists($jenisFile[$i] ?? '', self::JENIS_FILE) ? $jenisFile[$i] : 'dokumen_lain',
-                    'ket'   => mb_substr(trim((string) ($ketFile[$i] ?? '')), 0, 255),
-                ];
-            }
-        }
-
-        // ---------- Lampiran tautan ----------
-        $tautanBaru = [];
-        $jenisTaut  = (array) $this->request->getPost('jenis_tautan');
-        $ketTaut    = (array) $this->request->getPost('keterangan_tautan');
-        foreach ((array) $this->request->getPost('url_tautan') as $i => $url) {
-            $url = trim((string) $url);
-            if ($url === '') {
-                continue;
-            }
-            if (! preg_match('#^https?://#i', $url) || ! filter_var($url, FILTER_VALIDATE_URL)) {
-                $error[] = 'Tautan "' . $url . '" tidak valid (harus diawali http:// atau https://).';
-                continue;
-            }
-            $tautanBaru[] = [
-                'url'   => mb_substr($url, 0, 255),
-                'jenis' => array_key_exists($jenisTaut[$i] ?? '', self::JENIS_TAUTAN) ? $jenisTaut[$i] : 'tautan_publikasi',
-                'ket'   => mb_substr(trim((string) ($ketTaut[$i] ?? '')), 0, 255),
-            ];
-        }
-
         if ($error) {
             return redirect()->to('bank-inovasi')->with('gagal', implode(' ', $error));
         }
 
         $sekarang = date('Y-m-d H:i:s');
         $data     = $input + ['id_praktik_baik' => $idPraktik ?: null, 'updated_at' => $sekarang];
-        $db->transStart();
 
         if ($id) {
             // Perbaikan setelah ditolak: kembali ke verifikasi sekolah (tahap 1)
@@ -409,12 +322,6 @@ class CbankInovasi extends BaseController
                 ];
             }
             $db->table('bank_inovasi')->where('id_inovasi', $id)->update($data);
-
-            // Lampiran inovasi lama yang dicentang untuk dihapus
-            $hapus = array_map('intval', (array) $this->request->getPost('hapus_lampiran'));
-            if ($hapus) {
-                $this->hapusDokumen($db, $id, $hapus);
-            }
         } else {
             $db->table('bank_inovasi')->insert($data + [
                 'id_guru'                   => $idGuru,
@@ -423,39 +330,6 @@ class CbankInovasi extends BaseController
                 'status_verifikasi'         => 'menunggu',
                 'created_at'                => $sekarang,
             ]);
-            $id = (int) $db->insertID();
-        }
-
-        // Simpan lampiran baru
-        if ($fileBaru && ! is_dir(FCPATH . self::FOLDER)) {
-            mkdir(FCPATH . self::FOLDER, 0755, true);
-        }
-        foreach ($fileBaru as $f) {
-            $namaAcak = $f['file']->getRandomName();
-            $f['file']->move(FCPATH . self::FOLDER, $namaAcak);
-            $db->table('bank_inovasi_dokumen')->insert([
-                'id_inovasi'    => $id,
-                'jenis_dokumen' => $f['jenis'],
-                'nama_file'     => mb_substr($f['file']->getClientName(), 0, 255),
-                'path_file'     => self::FOLDER . $namaAcak,
-                'keterangan'    => $f['ket'] ?: null,
-                'created_at'    => $sekarang,
-            ]);
-        }
-        foreach ($tautanBaru as $t) {
-            $db->table('bank_inovasi_dokumen')->insert([
-                'id_inovasi'    => $id,
-                'jenis_dokumen' => $t['jenis'],
-                'nama_file'     => $t['url'],
-                'path_file'     => $t['url'],
-                'keterangan'    => $t['ket'] ?: null,
-                'created_at'    => $sekarang,
-            ]);
-        }
-
-        $db->transComplete();
-        if (! $db->transStatus()) {
-            return redirect()->to('bank-inovasi')->with('gagal', 'Terjadi kesalahan saat menyimpan. Silakan coba lagi.');
         }
 
         $judul = esc($input['judul_inovasi']);
@@ -486,28 +360,9 @@ class CbankInovasi extends BaseController
             return redirect()->to('bank-inovasi')->with('gagal', 'Inovasi yang sedang divalidasi atau sudah disetujui tidak bisa dihapus.');
         }
 
-        $db->transStart();
-        $this->hapusDokumen($db, (int) $id);
         $db->table('bank_inovasi')->where('id_inovasi', $id)->delete();
-        $db->transComplete();
 
         return redirect()->to('bank-inovasi')->with('sukses', 'Inovasi "' . esc($inovasi['judul_inovasi']) . '" berhasil dihapus.');
-    }
-
-    // Hapus lampiran inovasi beserta file fisiknya (lampiran praktik baik asal tidak tersentuh)
-    private function hapusDokumen($db, int $idInovasi, ?array $idDokumen = null): void
-    {
-        $q = $db->table('bank_inovasi_dokumen')->where('id_inovasi', $idInovasi);
-        if ($idDokumen !== null) {
-            $q->whereIn('id_dokumen', $idDokumen);
-        }
-
-        foreach ($q->get()->getResultArray() as $d) {
-            if ($d['path_file'] && ! preg_match('#^https?://#i', $d['path_file']) && is_file(FCPATH . $d['path_file'])) {
-                @unlink(FCPATH . $d['path_file']);
-            }
-            $db->table('bank_inovasi_dokumen')->where('id_dokumen', $d['id_dokumen'])->delete();
-        }
     }
 
     // =====================================================

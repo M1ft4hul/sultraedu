@@ -1,5 +1,4 @@
 <?php
-
 /** @var array $inovasi */
 /** @var string $status */
 /** @var array $jumlah */
@@ -241,11 +240,7 @@ $tabs = ['' => 'Semua'] + $label;
     function formatTanggal(t) {
         if (!t) return '-';
         const d = new Date(t.replace(' ', 'T'));
-        return d.toLocaleDateString('id-ID', {
-            day: '2-digit',
-            month: 'long',
-            year: 'numeric'
-        });
+        return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
     }
 
     // Isi teks dengan aman (tidak dieksekusi sebagai HTML)
@@ -280,17 +275,10 @@ $tabs = ['' => 'Semua'] + $label;
         if (!d.lampiran || d.lampiran.length === 0) {
             wadah.innerHTML = '<p class="text-slate-400 italic">Tidak ada lampiran.</p>';
         } else {
-            const ikon = {
-                foto: 'fa-image',
-                video: 'fa-video',
-                tautan_publikasi: 'fa-link'
-            };
+            const ikon = { foto: 'fa-image', video: 'fa-video', tautan_publikasi: 'fa-link' };
             d.lampiran.forEach(f => {
                 const a = document.createElement(f.url ? 'a' : 'div');
-                if (f.url) {
-                    a.href = f.url;
-                    a.target = '_blank';
-                }
+                if (f.url) { a.href = f.url; a.target = '_blank'; }
                 a.className = 'flex items-center gap-3 border rounded-lg p-2.5 hover:bg-slate-50';
 
                 const i = document.createElement('i');
@@ -303,10 +291,15 @@ $tabs = ['' => 'Semua'] + $label;
                 nama.textContent = f.nama_file || 'Dokumen';
                 const jenis = document.createElement('div');
                 jenis.className = 'text-[10px] text-slate-400 capitalize';
-                jenis.textContent = (f.jenis_dokumen || '').replaceAll('_', ' ');
+                jenis.textContent = (f.jenis_dokumen || '').replaceAll('_', ' ') + (f.keterangan ? ' • ' + f.keterangan : '');
                 teks.append(nama, jenis);
 
                 a.append(i, teks);
+                const sumber = document.createElement('span');
+                sumber.className = 'ml-auto shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full ' +
+                    (f.sumber === 'praktik' ? 'bg-blue-50 text-blue-700' : 'bg-indigo-50 text-indigo-700');
+                sumber.textContent = f.sumber === 'praktik' ? 'Praktik baik' : 'Inovasi';
+                a.appendChild(sumber);
                 wadah.appendChild(a);
             });
         }
