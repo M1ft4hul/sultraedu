@@ -1,5 +1,4 @@
 <?php
-
 /** @var array $kompetisi */
 /** @var array $label */
 /** @var array $kategoriBawaan */
@@ -29,7 +28,7 @@ $tombolMaju = [
 ];
 
 $bulan = [1 => 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-$tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', strtotime($d))] . ' ' . date('Y', strtotime($d)) : '-';
+$tgl   = fn ($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', strtotime($d))] . ' ' . date('Y', strtotime($d)) : '-';
 ?>
 <section class="space-y-6">
 
@@ -100,7 +99,11 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
                 $maju   = $urutan[$pos + 1] ?? null;
                 $mundur = $urutan[$pos - 1] ?? null;
                 ?>
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col gap-4">
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                    <?php if (! empty($k['banner'])) : ?>
+                        <img src="<?= base_url($k['banner']) ?>" alt="Banner <?= esc($k['nama_kompetisi'], 'attr') ?>" class="w-full aspect-video object-cover border-b">
+                    <?php endif; ?>
+                <div class="p-5 flex flex-col gap-4 flex-1">
 
                     <!-- Kepala kartu -->
                     <div class="flex justify-between items-start gap-3">
@@ -178,6 +181,24 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
                         </button>
                     <?php endif; ?>
 
+                    <!-- Bagikan ke WhatsApp -->
+                    <?php if ($st !== 'draft') : ?>
+                        <button type="button" data-kompetisi="<?= esc(json_encode([
+                            'id_kompetisi'    => $k['id_kompetisi'],
+                            'nama_kompetisi'  => $k['nama_kompetisi'],
+                            'deskripsi'       => $k['deskripsi'],
+                            'tanggal_mulai'   => $k['tanggal_mulai'],
+                            'tanggal_selesai' => $k['tanggal_selesai'],
+                            'status'          => $st,
+                            'hasil_diumumkan' => $k['hasil_diumumkan'],
+                            'banner'          => $k['banner'] ?? null,
+                            'kategori'        => array_map(fn ($x) => $x['nama_kategori'] ?? $x, $k['kategori']),
+                        ]), 'attr') ?>" onclick="bukaBagikan(JSON.parse(this.dataset.kompetisi))"
+                            class="w-full text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center justify-center bg-green-600 hover:bg-green-700 text-white transition">
+                            <i class="fa-brands fa-whatsapp text-base mr-2"></i>Bagikan ke WhatsApp
+                        </button>
+                    <?php endif; ?>
+
                     <!-- Tombol tahapan -->
                     <div class="flex flex-wrap justify-between items-center gap-2 pt-3 border-t mt-auto">
                         <div>
@@ -200,6 +221,7 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
                         <?php endif; ?>
                     </div>
                 </div>
+                </div>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
@@ -209,7 +231,7 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
      MODAL FORM BUAT / EDIT KOMPETISI
      ===================================================== -->
 <div id="modalKompetisiForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <form action="<?= site_url('kompetisi/simpan') ?>" method="post"
+    <form action="<?= site_url('kompetisi/simpan') ?>" method="post" enctype="multipart/form-data"
         class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl max-h-[90vh] flex flex-col text-xs">
         <?= csrf_field() ?>
         <input type="hidden" name="id_kompetisi" id="k_id">
@@ -256,6 +278,24 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
                     <div>
                         <label class="font-semibold block mb-1 text-slate-700">Tanggal Selesai <span class="text-red-500">*</span></label>
                         <input type="date" name="tanggal_selesai" id="k_selesai" required class="w-full border border-slate-300 rounded-lg p-2.5">
+                    </div>
+                </div>
+
+                <!-- Banner lomba -->
+                <div>
+                    <label class="font-semibold block mb-1 text-slate-700">Banner Lomba</label>
+                    <div class="flex flex-col md:flex-row gap-3 items-start">
+                        <div id="k_bannerPratinjau" class="w-full md:w-56 aspect-video rounded-xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
+                            <span class="text-slate-400 text-center px-3"><i class="fa-regular fa-image text-2xl block mb-1"></i>Belum ada banner</span>
+                        </div>
+                        <div class="flex-1 space-y-2">
+                            <input type="file" name="banner" id="k_banner" accept=".jpg,.jpeg,.png,.webp" onchange="pratinjauBanner(this)"
+                                class="w-full border border-slate-300 rounded-lg p-1.5 text-xs file:mr-2 file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:rounded">
+                            <p class="text-[10px] text-slate-400">JPG, PNG, atau WEBP, maksimal 2 MB. Disarankan rasio 16:9 atau 1:1 (misalnya desain dari Canva). Banner dipakai saat membagikan lomba ke WhatsApp.</p>
+                            <label id="k_hapusBannerWrap" class="hidden items-center gap-2 text-red-600 cursor-pointer">
+                                <input type="checkbox" name="hapus_banner" value="1" class="accent-red-600"> Hapus banner saat ini
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -377,7 +417,7 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
         };
 
         const nama = buatInput('kriteria_nama[]', k.nama_kriteria, 'Nama kriteria', 'col-span-4');
-        const ket = buatInput('kriteria_keterangan[]', k.keterangan, 'Keterangan singkat', 'col-span-5');
+        const ket  = buatInput('kriteria_keterangan[]', k.keterangan, 'Keterangan singkat', 'col-span-5');
         const skor = buatInput('kriteria_skor[]', k.skor_maks, '0', 'col-span-2 text-center font-bold', 'number');
         skor.min = 1;
         skor.max = 100;
@@ -388,10 +428,7 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
         hapus.title = 'Hapus kriteria';
         hapus.className = 'tombol-rubrik col-span-1 border border-slate-200 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50';
         hapus.innerHTML = '<i class="fa-solid fa-xmark"></i>';
-        hapus.onclick = () => {
-            baris.remove();
-            hitungTotal();
-        };
+        hapus.onclick = () => { baris.remove(); hitungTotal(); };
 
         baris.append(nama, ket, skor, hapus);
         document.getElementById('daftarKriteria').appendChild(baris);
@@ -417,6 +454,7 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
         document.getElementById('k_mulai').value = d?.tanggal_mulai || '';
         document.getElementById('k_selesai').value = d?.tanggal_selesai || '';
         document.getElementById('k_judul_form').innerText = edit ? 'Edit Kompetisi' : 'Buat Kompetisi';
+        tampilBannerLama(edit ? (d.banner || null) : null);
 
         // Isi kategori & kriteria (pakai bawaan kalau kosong)
         document.getElementById('daftarKategori').innerHTML = '';
@@ -439,7 +477,7 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
 
     // ---------- Konfirmasi ----------
     const GAYA = {
-        red: ['bg-red-100 text-red-600', 'bg-red-600 hover:bg-red-700'],
+        red:   ['bg-red-100 text-red-600',     'bg-red-600 hover:bg-red-700'],
         amber: ['bg-amber-100 text-amber-600', 'bg-amber-500 hover:bg-amber-600'],
         brand: ['bg-brand-100 text-brand-600', 'bg-brand-600 hover:bg-brand-700'],
     };
@@ -474,15 +512,15 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
         ?>
         document.addEventListener('DOMContentLoaded', function() {
             bukaFormKompetisi(<?= json_encode([
-                                    'id_kompetisi'    => old('id_kompetisi'),
-                                    'nama_kompetisi'  => old('nama_kompetisi'),
-                                    'deskripsi'       => old('deskripsi'),
-                                    'tanggal_mulai'   => old('tanggal_mulai'),
-                                    'tanggal_selesai' => old('tanggal_selesai'),
-                                    'kategori'        => array_values((array) old('kategori')),
-                                    'kriteria'        => $oldKriteria,
-                                    'jumlah_peserta'  => 0,
-                                ]) ?>);
+                'id_kompetisi'    => old('id_kompetisi'),
+                'nama_kompetisi'  => old('nama_kompetisi'),
+                'deskripsi'       => old('deskripsi'),
+                'tanggal_mulai'   => old('tanggal_mulai'),
+                'tanggal_selesai' => old('tanggal_selesai'),
+                'kategori'        => array_values((array) old('kategori')),
+                'kriteria'        => $oldKriteria,
+                'jumlah_peserta'  => 0,
+            ]) ?>);
         });
     <?php endif; ?>
 </script>
@@ -540,26 +578,14 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
     let kategoriAktif = '';
 
     const WARNA_JUARA = {
-        1: {
-            kartu: 'border-amber-300 bg-gradient-to-b from-amber-50 to-white',
-            pita: 'bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-950',
-            ikon: 'text-amber-500'
-        },
-        2: {
-            kartu: 'border-slate-300 bg-gradient-to-b from-slate-50 to-white',
-            pita: 'bg-gradient-to-r from-slate-300 to-slate-400 text-slate-900',
-            ikon: 'text-slate-400'
-        },
-        3: {
-            kartu: 'border-orange-300 bg-gradient-to-b from-orange-50 to-white',
-            pita: 'bg-gradient-to-r from-orange-300 to-orange-400 text-orange-950',
-            ikon: 'text-orange-500'
-        },
+        1: { kartu: 'border-amber-300 bg-gradient-to-b from-amber-50 to-white', pita: 'bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-950', ikon: 'text-amber-500' },
+        2: { kartu: 'border-slate-300 bg-gradient-to-b from-slate-50 to-white', pita: 'bg-gradient-to-r from-slate-300 to-slate-400 text-slate-900', ikon: 'text-slate-400' },
+        3: { kartu: 'border-orange-300 bg-gradient-to-b from-orange-50 to-white', pita: 'bg-gradient-to-r from-orange-300 to-orange-400 text-orange-950', ikon: 'text-orange-500' },
     };
     const VALIDASI = {
-        menunggu: ['Menunggu validasi', 'bg-amber-100 text-amber-800'],
+        menunggu:    ['Menunggu validasi', 'bg-amber-100 text-amber-800'],
         tervalidasi: ['Tervalidasi', 'bg-emerald-100 text-emerald-800'],
-        ditolak: ['Ditolak', 'bg-red-100 text-red-700'],
+        ditolak:     ['Ditolak', 'bg-red-100 text-red-700'],
     };
 
     const el = (tag, kelas, teks) => {
@@ -582,25 +608,19 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
 
         const jumlahSekolah = new Set(k.peserta.map(p => p.nama_sekolah)).size;
         document.getElementById('ps_sub').textContent = k.peserta.length + ' karya • ' + jumlahSekolah + ' sekolah • ' + k.kategori.length + ' kategori';
-        document.getElementById('ps_catatan').textContent = diumumkan ?
-            'Juara ditetapkan dari rata-rata nilai seluruh juri di setiap kategori.' :
-            'Klik judul karya untuk membaca deskripsi lengkapnya.';
+        document.getElementById('ps_catatan').textContent = diumumkan
+            ? 'Juara ditetapkan dari rata-rata nilai seluruh juri di setiap kategori.'
+            : 'Klik judul karya untuk membaca deskripsi lengkapnya.';
         document.getElementById('ps_cari').value = '';
 
         // Filter kategori
         const filter = document.getElementById('ps_filter');
         filter.innerHTML = '';
-        [{
-            id_kategori: '',
-            nama_kategori: 'Semua kategori'
-        }, ...k.kategori].forEach(kat => {
+        [{ id_kategori: '', nama_kategori: 'Semua kategori' }, ...k.kategori].forEach(kat => {
             const b = el('button', 'tombol-kat', kat.nama_kategori);
             b.type = 'button';
             b.dataset.id = kat.id_kategori;
-            b.onclick = () => {
-                kategoriAktif = String(kat.id_kategori);
-                renderPeserta();
-            };
+            b.onclick = () => { kategoriAktif = String(kat.id_kategori); renderPeserta(); };
             filter.appendChild(b);
         });
 
@@ -736,6 +756,185 @@ $tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', 
         video.classList.toggle('hidden', !aman);
         if (aman) video.href = p.link_video;
         openModal('modalKarya');
+    }
+</script>
+
+<!-- =====================================================
+     MODAL BAGIKAN KE WHATSAPP
+     ===================================================== -->
+<div id="modalBagikan" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[92vh] flex flex-col text-xs">
+        <div class="flex justify-between items-start border-b p-5">
+            <div>
+                <h3 class="font-bold text-slate-800 text-base"><i class="fa-brands fa-whatsapp text-green-600 mr-2"></i>Bagikan ke WhatsApp</h3>
+                <p id="b_nama" class="text-slate-500 mt-0.5"></p>
+            </div>
+            <button type="button" onclick="closeModal('modalBagikan')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <div class="overflow-y-auto p-5 space-y-4">
+            <img id="b_banner" alt="Banner lomba" class="hidden w-full rounded-xl border">
+            <div id="b_tanpaBanner" class="hidden bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3">
+                <i class="fa-solid fa-circle-info mr-1"></i>Lomba ini belum punya banner. Pesan dikirim sebagai teks saja. Unggah banner lewat tombol Edit.
+            </div>
+            <div>
+                <label class="font-semibold block mb-1 text-slate-700">Teks Pengumuman <span class="font-normal text-slate-400">(bisa diedit)</span></label>
+                <textarea id="b_teks" rows="12" class="w-full border border-slate-300 rounded-lg p-2.5 font-mono text-[11px] leading-relaxed"></textarea>
+            </div>
+            <div class="bg-slate-50 border rounded-xl p-3 text-[11px] text-slate-500 space-y-1">
+                <p><i class="fa-solid fa-mobile-screen mr-1"></i><b>Di HP:</b> banner dan teks dikirim bersamaan. Pilih WhatsApp, lalu pilih grup atau kontak.</p>
+                <p><i class="fa-solid fa-desktop mr-1"></i><b>Di komputer:</b> WhatsApp Web terbuka dengan teks dan tautan lomba. Banner tampil sebagai pratinjau tautan setelah aplikasi online, atau unduh banner lalu lampirkan manual.</p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap justify-end gap-2 border-t p-5 bg-slate-50 rounded-b-2xl">
+            <a id="b_unduh" download class="hidden px-4 py-2 border rounded-lg font-semibold text-slate-600 bg-white hover:bg-slate-100 items-center">
+                <i class="fa-solid fa-download mr-1.5"></i>Unduh Banner
+            </a>
+            <button type="button" onclick="salinPengumuman(this)" class="px-4 py-2 border rounded-lg font-semibold text-slate-600 bg-white hover:bg-slate-100">
+                <i class="fa-regular fa-copy mr-1.5"></i>Salin Teks
+            </button>
+            <button type="button" onclick="kirimWhatsApp(this)" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold">
+                <i class="fa-brands fa-whatsapp mr-1.5"></i>Kirim ke WhatsApp
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const URL_DASAR  = '<?= rtrim(base_url(), '/') ?>/';
+    const URL_LOMBA  = '<?= site_url('lomba') ?>/';
+    const URL_LOGIN  = '<?= site_url('login') ?>';
+    let bagikanAktif = null;
+
+    // ---------- Banner di form ----------
+    function pratinjauBanner(input) {
+        const wadah = document.getElementById('k_bannerPratinjau');
+        const file = input.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            alert('Ukuran banner maksimal 2 MB.');
+            input.value = '';
+            return;
+        }
+        const img = document.createElement('img');
+        img.className = 'w-full h-full object-cover';
+        img.src = URL.createObjectURL(file);
+        wadah.innerHTML = '';
+        wadah.appendChild(img);
+    }
+
+    function tampilBannerLama(path) {
+        const wadah = document.getElementById('k_bannerPratinjau');
+        document.getElementById('k_banner').value = '';
+        const hapus = document.getElementById('k_hapusBannerWrap');
+        hapus.classList.toggle('hidden', !path);
+        hapus.classList.toggle('flex', !!path);
+        hapus.querySelector('input').checked = false;
+        if (path) {
+            const img = document.createElement('img');
+            img.className = 'w-full h-full object-cover';
+            img.src = URL_DASAR + path;
+            wadah.innerHTML = '';
+            wadah.appendChild(img);
+        } else {
+            wadah.innerHTML = '<span class="text-slate-400 text-center px-3"><i class="fa-regular fa-image text-2xl block mb-1"></i>Belum ada banner</span>';
+        }
+    }
+
+    // ---------- Teks pengumuman otomatis ----------
+    function tanggalPanjang(t) {
+        return new Date(t + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function susunPengumuman(k) {
+        const baris = [];
+        const diumumkan = !!parseInt(k.hasil_diumumkan);
+
+        if (k.status === 'pendaftaran') baris.push('📢 *PENDAFTARAN DIBUKA*');
+        else if (k.status === 'berlangsung') baris.push('⚖️ *TAHAP PENJURIAN*');
+        else baris.push(diumumkan ? '🏆 *PENGUMUMAN PEMENANG*' : '🏁 *KOMPETISI SELESAI*');
+
+        baris.push('*' + k.nama_kompetisi + '*', '');
+        baris.push('🗓️ Periode: ' + tanggalPanjang(k.tanggal_mulai) + ' s.d. ' + tanggalPanjang(k.tanggal_selesai));
+
+        if (k.kategori && k.kategori.length) {
+            baris.push('', '🏷️ Kategori lomba:');
+            k.kategori.forEach(nama => baris.push('• ' + nama));
+        }
+        if (k.deskripsi) {
+            baris.push('', '📝 Ketentuan:', k.deskripsi);
+        }
+
+        baris.push('');
+        if (k.status === 'pendaftaran') {
+            const sisa = Math.floor((new Date(k.tanggal_selesai + 'T23:59:59') - new Date()) / 86400000);
+            if (sisa >= 0) baris.push('⏳ Pendaftaran ditutup ' + (sisa === 0 ? '*hari ini*' : 'dalam *' + sisa + ' hari*') + '.');
+            baris.push('Bapak/Ibu guru SMA/SMK/SLB se-Sulawesi Tenggara dapat mendaftarkan karya melalui akun EDUVATION masing-masing.');
+        } else if (diumumkan) {
+            baris.push('Selamat kepada para pemenang! Hasil lengkap dapat dilihat melalui akun EDUVATION.');
+        }
+
+        baris.push('', '🔗 Info lomba: ' + URL_LOMBA + k.id_kompetisi);
+        if (k.status === 'pendaftaran') baris.push('🔑 Masuk: ' + URL_LOGIN);
+        baris.push('', '_Dinas Pendidikan dan Kebudayaan Provinsi Sulawesi Tenggara_');
+
+        return baris.join('\n');
+    }
+
+    function bukaBagikan(k) {
+        bagikanAktif = k;
+        document.getElementById('b_nama').textContent = k.nama_kompetisi;
+        document.getElementById('b_teks').value = susunPengumuman(k);
+
+        const img = document.getElementById('b_banner');
+        const unduh = document.getElementById('b_unduh');
+        const ada = !!k.banner;
+        img.classList.toggle('hidden', !ada);
+        unduh.classList.toggle('hidden', !ada);
+        unduh.classList.toggle('inline-flex', ada);
+        document.getElementById('b_tanpaBanner').classList.toggle('hidden', ada);
+        if (ada) {
+            img.src = URL_DASAR + k.banner;
+            unduh.href = URL_DASAR + k.banner;
+        }
+        openModal('modalBagikan');
+    }
+
+    function salinPengumuman(tombol) {
+        navigator.clipboard.writeText(document.getElementById('b_teks').value).then(() => {
+            const awal = tombol.innerHTML;
+            tombol.innerHTML = '<i class="fa-solid fa-check mr-1.5"></i>Tersalin!';
+            setTimeout(() => tombol.innerHTML = awal, 2000);
+        });
+    }
+
+    async function kirimWhatsApp(tombol) {
+        const teks = document.getElementById('b_teks').value;
+        const k = bagikanAktif;
+
+        // HP: kirim banner + teks lewat menu bagikan bawaan
+        if (k.banner && navigator.canShare) {
+            const awal = tombol.innerHTML;
+            tombol.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Menyiapkan...';
+            try {
+                const res = await fetch(URL_DASAR + k.banner);
+                const blob = await res.blob();
+                const ext = (k.banner.split('.').pop() || 'jpg').toLowerCase();
+                const file = new File([blob], 'banner-lomba.' + ext, { type: blob.type || 'image/jpeg' });
+                if (navigator.canShare({ files: [file], text: teks })) {
+                    await navigator.share({ files: [file], text: teks, title: k.nama_kompetisi });
+                    tombol.innerHTML = awal;
+                    return;
+                }
+            } catch (e) {
+                if (e && e.name === 'AbortError') { tombol.innerHTML = awal; return; } // dibatalkan pengguna
+            }
+            tombol.innerHTML = awal;
+        }
+
+        // Komputer / tanpa banner: buka WhatsApp dengan teks
+        window.open('https://wa.me/?text=' + encodeURIComponent(teks), '_blank', 'noopener');
     }
 </script>
 <?= $this->endSection() ?>

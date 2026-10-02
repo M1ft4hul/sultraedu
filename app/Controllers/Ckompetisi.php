@@ -91,7 +91,7 @@ class Ckompetisi extends BaseController
 
         if ($tab === 'buka') {
             $kompetisi = $db->table('kompetisi')
-                ->select('id_kompetisi, nama_kompetisi, deskripsi, tanggal_mulai, tanggal_selesai')
+                ->select('id_kompetisi, nama_kompetisi, deskripsi, banner, tanggal_mulai, tanggal_selesai')
                 ->where('status', 'pendaftaran')
                 ->orderBy('tanggal_selesai', 'ASC')
                 ->get()->getResultArray();
@@ -100,29 +100,21 @@ class Ckompetisi extends BaseController
             $kategori = $kriteria = $milikSaya = $jumlahPeserta = [];
 
             if ($ids) {
-                foreach (
-                    $db->table('kompetisi_kategori')->select('id_kategori, id_kompetisi, nama_kategori, deskripsi')
-                        ->whereIn('id_kompetisi', $ids)->orderBy('urutan', 'ASC')->get()->getResultArray() as $r
-                ) {
+                foreach ($db->table('kompetisi_kategori')->select('id_kategori, id_kompetisi, nama_kategori, deskripsi')
+                    ->whereIn('id_kompetisi', $ids)->orderBy('urutan', 'ASC')->get()->getResultArray() as $r) {
                     $kategori[$r['id_kompetisi']][] = $r;
                 }
-                foreach (
-                    $db->table('kompetisi_kriteria')->select('id_kompetisi, nama_kriteria, keterangan, skor_maks')
-                        ->whereIn('id_kompetisi', $ids)->orderBy('urutan', 'ASC')->get()->getResultArray() as $r
-                ) {
+                foreach ($db->table('kompetisi_kriteria')->select('id_kompetisi, nama_kriteria, keterangan, skor_maks')
+                    ->whereIn('id_kompetisi', $ids)->orderBy('urutan', 'ASC')->get()->getResultArray() as $r) {
                     $kriteria[$r['id_kompetisi']][] = $r;
                 }
-                foreach (
-                    $db->table('kompetisi_peserta')
-                        ->select('id_peserta, id_kompetisi, id_kategori, id_praktik_baik, judul_karya, deskripsi_karya, link_video, status_validasi, created_at')
-                        ->where('id_guru', $idGuru)->whereIn('id_kompetisi', $ids)->get()->getResultArray() as $r
-                ) {
+                foreach ($db->table('kompetisi_peserta')
+                    ->select('id_peserta, id_kompetisi, id_kategori, id_praktik_baik, judul_karya, deskripsi_karya, link_video, status_validasi, created_at')
+                    ->where('id_guru', $idGuru)->whereIn('id_kompetisi', $ids)->get()->getResultArray() as $r) {
                     $milikSaya[$r['id_kompetisi']] = $r;
                 }
-                foreach (
-                    $db->table('kompetisi_peserta')->select('id_kompetisi, COUNT(*) AS jumlah')
-                        ->whereIn('id_kompetisi', $ids)->groupBy('id_kompetisi')->get()->getResultArray() as $r
-                ) {
+                foreach ($db->table('kompetisi_peserta')->select('id_kompetisi, COUNT(*) AS jumlah')
+                    ->whereIn('id_kompetisi', $ids)->groupBy('id_kompetisi')->get()->getResultArray() as $r) {
                     $jumlahPeserta[$r['id_kompetisi']] = (int) $r['jumlah'];
                 }
             }
@@ -156,7 +148,7 @@ class Ckompetisi extends BaseController
                 ->get()->getResultArray();
 
             // Rincian nilai per kriteria (rata-rata semua juri), hanya untuk hasil yang sudah diumumkan
-            $idDiumumkan = array_column(array_filter($riwayat, fn($r) => $r['hasil_diumumkan']), 'id_peserta');
+            $idDiumumkan = array_column(array_filter($riwayat, fn ($r) => $r['hasil_diumumkan']), 'id_peserta');
             $rincian     = [];
             if ($idDiumumkan) {
                 $baris = $db->table('kompetisi_nilai n')
@@ -362,7 +354,7 @@ class Ckompetisi extends BaseController
             $semua = $peserta[$k['id_kompetisi']] ?? [];
 
             // Hanya karya sekolah sendiri yang dikirim ke halaman
-            $milikSendiri = array_values(array_filter($semua, fn($d) => (int) $d['id_sekolah'] === $idSekolah));
+            $milikSendiri = array_values(array_filter($semua, fn ($d) => (int) $d['id_sekolah'] === $idSekolah));
 
             foreach ($milikSendiri as &$d) {
                 unset($d['id_sekolah'], $d['nama_sekolah']);
@@ -564,6 +556,33 @@ class Ckompetisi extends BaseController
             }
         }
 
+        // ---------- Banner lomba (opsional) ----------
+        $bannerLama = $edit ? $db->table('kompetisi')->select('banner')->where('id_kompetisi', $id)->get()->getRow('banner') : null;
+        $bannerBaru = null;
+        $file       = $this->request->getFile('banner');
+
+        if ($file && $file->getError() !== UPLOAD_ERR_NO_FILE) {
+            if (! $file->isValid()) {
+                return $this->gagalForm('Banner gagal diunggah. Coba lagi.');
+            }
+            if (! in_array(strtolower($file->getClientExtension()), ['jpg', 'jpeg', 'png', 'webp'], true)
+                || ! str_starts_with((string) $file->getMimeType(), 'image/')) {
+                return $this->gagalForm('Banner harus berupa gambar JPG, PNG, atau WEBP.');
+            }
+            if ($file->getSizeByUnit('kb') > 2048) {
+                return $this->gagalForm('Ukuran banner maksimal 2 MB.');
+            }
+            if (! is_dir(FCPATH . 'uploads/banner')) {
+                mkdir(FCPATH . 'uploads/banner', 0755, true);
+            }
+            $namaAcak = $file->getRandomName();
+            $file->move(FCPATH . 'uploads/banner', $namaAcak);
+            $bannerBaru      = 'uploads/banner/' . $namaAcak;
+            $input['banner'] = $bannerBaru;
+        } elseif ($edit && $this->request->getPost('hapus_banner')) {
+            $input['banner'] = null;
+        }
+
         $sekarang = date('Y-m-d H:i:s');
         $db->transStart();
 
@@ -600,7 +619,17 @@ class Ckompetisi extends BaseController
         $db->transComplete();
 
         if (! $db->transStatus()) {
+            // Batalkan file banner yang baru diunggah
+            if ($bannerBaru && is_file(FCPATH . $bannerBaru)) {
+                @unlink(FCPATH . $bannerBaru);
+            }
+
             return $this->gagalForm('Terjadi kesalahan saat menyimpan. Coba lagi.');
+        }
+
+        // Banner lama dihapus kalau diganti atau dihapus
+        if ($bannerLama && array_key_exists('banner', $input) && is_file(FCPATH . $bannerLama)) {
+            @unlink(FCPATH . $bannerLama);
         }
 
         $pesanSukses = $edit
@@ -675,7 +704,7 @@ class Ckompetisi extends BaseController
 
             if ($tanpaJuri) {
                 $redirect->with('peringatan', 'Kategori berikut belum memiliki juri: '
-                    . implode(', ', array_map(fn($r) => $r['nama_kategori'], $tanpaJuri))
+                    . implode(', ', array_map(fn ($r) => $r['nama_kategori'], $tanpaJuri))
                     . '. Tugaskan juri melalui menu Kelola Data → Tim Juri supaya karyanya bisa dinilai.');
             }
         }
@@ -704,6 +733,9 @@ class Ckompetisi extends BaseController
 
         // Kategori & kriteria ikut terhapus otomatis (ON DELETE CASCADE)
         $db->table('kompetisi')->where('id_kompetisi', $id)->delete();
+        if (! empty($kompetisi['banner']) && is_file(FCPATH . $kompetisi['banner'])) {
+            @unlink(FCPATH . $kompetisi['banner']);
+        }
 
         return redirect()->to('kompetisi')->with('sukses', 'Kompetisi "' . esc($kompetisi['nama_kompetisi']) . '" berhasil dihapus.');
     }

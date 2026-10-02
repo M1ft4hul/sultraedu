@@ -1,5 +1,4 @@
 <?php
-
 /** @var string $tab */
 /** @var array $jumlahTab */
 /** @var array $label */
@@ -12,8 +11,8 @@
 <?= $this->section('content') ?>
 <?php
 $bulan = [1 => 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-$tgl   = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', strtotime($d))] . ' ' . date('Y', strtotime($d)) : '-';
-$angka = fn($n) => number_format((float) $n, 2, ',', '.');
+$tgl   = fn ($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', strtotime($d))] . ' ' . date('Y', strtotime($d)) : '-';
+$angka = fn ($n) => number_format((float) $n, 2, ',', '.');
 
 // Sisa hari pendaftaran
 $sisaHari = function ($tanggal) {
@@ -81,6 +80,10 @@ $badgeTahap = [
                 <?php foreach ($kompetisi as $k) : ?>
                     <?php $karya = $k['karya']; ?>
                     <div class="bg-white rounded-2xl border <?= $karya ? 'border-emerald-300' : 'border-slate-200' ?> shadow-sm overflow-hidden text-xs">
+
+                        <?php if (! empty($k['banner'])) : ?>
+                            <img src="<?= base_url($k['banner']) ?>" alt="Banner <?= esc($k['nama_kompetisi'], 'attr') ?>" class="w-full max-h-72 object-cover border-b">
+                        <?php endif; ?>
 
                         <div class="p-5 space-y-3">
                             <div class="flex flex-wrap justify-between items-start gap-3">
@@ -408,11 +411,7 @@ $badgeTahap = [
             document.getElementById('n_piala').className = 'w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ' + (warnaPiala[juara] || 'bg-slate-100 text-slate-400');
             const hasil = document.getElementById('n_hasil');
             hasil.textContent = juara ? 'Juara ' + juara : 'Peserta';
-            hasil.className = 'text-[11px] font-bold uppercase tracking-wider ' + ({
-                1: 'text-amber-600',
-                2: 'text-slate-500',
-                3: 'text-orange-600'
-            } [juara] || 'text-slate-400');
+            hasil.className = 'text-[11px] font-bold uppercase tracking-wider ' + ({ 1: 'text-amber-600', 2: 'text-slate-500', 3: 'text-orange-600' }[juara] || 'text-slate-400');
             document.getElementById('n_judul').textContent = r.judul_karya;
             document.getElementById('n_sub').textContent = r.nama_kompetisi + (r.nama_kategori ? ' • ' + r.nama_kategori : '');
             document.getElementById('n_total').textContent = angka(r.nilai || 0);
@@ -440,9 +439,9 @@ $badgeTahap = [
             });
 
             const jumlahJuri = rincian.length ? Math.max(...rincian.map(k => k.juri)) : 0;
-            document.getElementById('n_catatan').textContent = jumlahJuri ?
-                'Skor setiap kriteria adalah rata-rata dari ' + jumlahJuri + ' juri. Hijau = kuat (≥80%), kuning = cukup (60–79%), merah = perlu ditingkatkan (<60%).' :
-                '';
+            document.getElementById('n_catatan').textContent = jumlahJuri
+                ? 'Skor setiap kriteria adalah rata-rata dari ' + jumlahJuri + ' juri. Hijau = kuat (≥80%), kuning = cukup (60–79%), merah = perlu ditingkatkan (<60%).'
+                : '';
 
             openModal('modalNilai');
         }
