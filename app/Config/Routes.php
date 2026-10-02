@@ -98,3 +98,5 @@ $routes->get('rekap-penilaian/export/(:num)', 'Crekap::export/$1');
 
 // Halaman publik info lomba (tanpa login)
 $routes->get('lomba/(:num)', 'Clomba::detail/$1');
+
+$routes->post('sekolah/import', 'Csekolah::import');

@@ -1,9 +1,9 @@
 <?php
-
 /** @var array $sekolah */
 /** @var array $filter */
 /** @var array $kabKota */
 /** @var array $ringkas */
+/** @var array $npsnAda */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
@@ -14,7 +14,8 @@ $badgeJenjang = [
     'SMK' => 'bg-indigo-50 text-indigo-700',
     'SLB' => 'bg-purple-50 text-purple-700',
 ];
-$errors = session()->getFlashdata('errors') ?? [];
+$errors  = session()->getFlashdata('errors') ?? [];
+$laporan = session()->getFlashdata('laporanImport');
 ?>
 <section class="space-y-6">
 
@@ -24,10 +25,16 @@ $errors = session()->getFlashdata('errors') ?? [];
             <h2 class="text-xl font-bold text-slate-800">Data Sekolah</h2>
             <p class="text-xs text-slate-500">Data master satuan pendidikan SMA, SMK, dan SLB se-Provinsi Sulawesi Tenggara.</p>
         </div>
-        <button type="button" onclick="bukaFormSekolah()"
-            class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow transition flex items-center">
-            <i class="fa-solid fa-plus mr-2"></i>Tambah Sekolah
-        </button>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" onclick="bukaImport()"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow transition flex items-center">
+                <i class="fa-solid fa-file-excel mr-2"></i>Import Excel
+            </button>
+            <button type="button" onclick="bukaFormSekolah()"
+                class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow transition flex items-center">
+                <i class="fa-solid fa-plus mr-2"></i>Tambah Sekolah
+            </button>
+        </div>
     </div>
 
     <!-- Ringkasan -->
@@ -45,6 +52,27 @@ $errors = session()->getFlashdata('errors') ?? [];
             <div class="text-xl font-bold text-slate-400"><?= number_format($ringkas['nonaktif'], 0, ',', '.') ?></div>
         </div>
     </div>
+
+    <!-- Laporan hasil import -->
+    <?php if ($laporan) : ?>
+        <div class="bg-white border-2 border-emerald-200 rounded-2xl p-5 text-xs space-y-3">
+            <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-file-circle-check text-emerald-600 mr-2"></i>Hasil Import Excel</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="bg-emerald-50 rounded-xl p-3"><div class="text-[10px] uppercase text-emerald-700">Ditambahkan</div><div class="text-xl font-bold text-emerald-700"><?= $laporan['tambah'] ?></div></div>
+                <div class="bg-blue-50 rounded-xl p-3"><div class="text-[10px] uppercase text-blue-700">Diperbarui</div><div class="text-xl font-bold text-blue-700"><?= $laporan['ubah'] ?></div></div>
+                <div class="bg-slate-50 rounded-xl p-3"><div class="text-[10px] uppercase text-slate-500">Dilewati (sudah ada)</div><div class="text-xl font-bold text-slate-600"><?= $laporan['dilewati'] ?></div></div>
+                <div class="<?= $laporan['gagal'] ? 'bg-red-50' : 'bg-slate-50' ?> rounded-xl p-3"><div class="text-[10px] uppercase <?= $laporan['gagal'] ? 'text-red-700' : 'text-slate-500' ?>">Gagal</div><div class="text-xl font-bold <?= $laporan['gagal'] ? 'text-red-700' : 'text-slate-600' ?>"><?= count($laporan['gagal']) ?></div></div>
+            </div>
+            <?php if ($laporan['gagal']) : ?>
+                <details class="bg-red-50 border border-red-200 rounded-xl p-3">
+                    <summary class="cursor-pointer font-semibold text-red-700">Lihat baris yang gagal</summary>
+                    <ul class="list-disc list-inside mt-2 space-y-0.5 text-red-700 max-h-48 overflow-y-auto">
+                        <?php foreach ($laporan['gagal'] as $g) : ?><li><?= esc($g) ?></li><?php endforeach; ?>
+                    </ul>
+                </details>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
 
     <!-- Pesan sukses / gagal -->
     <?php if (session()->getFlashdata('sukses')) : ?>
@@ -310,8 +338,7 @@ $errors = session()->getFlashdata('errors') ?? [];
     // Buka form: tanpa data = tambah baru, dengan data = edit
     function bukaFormSekolah(data = null) {
         const kolom = ['id_sekolah', 'npsn', 'nama_sekolah', 'jenjang', 'kabupaten_kota',
-            'kecamatan', 'alamat', 'telepon', 'email', 'status'
-        ];
+                       'kecamatan', 'alamat', 'telepon', 'email', 'status'];
 
         kolom.forEach(k => {
             const el = document.getElementById('f_' + k);
@@ -333,9 +360,9 @@ $errors = session()->getFlashdata('errors') ?? [];
         const ikon = document.getElementById('konfirmasiIkon');
         const tombol = document.getElementById('konfirmasiTombol');
         const gaya = {
-            red: ['bg-red-100 text-red-600', 'bg-red-600 hover:bg-red-700'],
+            red:   ['bg-red-100 text-red-600',     'bg-red-600 hover:bg-red-700'],
             amber: ['bg-amber-100 text-amber-600', 'bg-amber-500 hover:bg-amber-600'],
-        } [warna];
+        }[warna];
 
         ikon.className = 'mx-auto w-14 h-14 rounded-full flex items-center justify-center ' + gaya[0];
         tombol.className = 'px-4 py-2 text-white rounded-lg text-xs font-semibold ' + gaya[1];
@@ -347,18 +374,298 @@ $errors = session()->getFlashdata('errors') ?? [];
     <?php if ($errors) : ?>
         document.addEventListener('DOMContentLoaded', function() {
             bukaFormSekolah(<?= json_encode([
-                                'id_sekolah'     => old('id_sekolah'),
-                                'npsn'           => old('npsn'),
-                                'nama_sekolah'   => old('nama_sekolah'),
-                                'jenjang'        => old('jenjang'),
-                                'kabupaten_kota' => old('kabupaten_kota'),
-                                'kecamatan'      => old('kecamatan'),
-                                'alamat'         => old('alamat'),
-                                'telepon'        => old('telepon'),
-                                'email'          => old('email'),
-                                'status'         => old('status'),
-                            ]) ?>);
+                'id_sekolah'     => old('id_sekolah'),
+                'npsn'           => old('npsn'),
+                'nama_sekolah'   => old('nama_sekolah'),
+                'jenjang'        => old('jenjang'),
+                'kabupaten_kota' => old('kabupaten_kota'),
+                'kecamatan'      => old('kecamatan'),
+                'alamat'         => old('alamat'),
+                'telepon'        => old('telepon'),
+                'email'          => old('email'),
+                'status'         => old('status'),
+            ]) ?>);
         });
     <?php endif; ?>
+</script>
+
+<!-- =====================================================
+     MODAL IMPORT EXCEL
+     ===================================================== -->
+<div id="modalImport" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <form action="<?= site_url('sekolah/import') ?>" method="post" onsubmit="return kirimImport()"
+        class="bg-white rounded-2xl max-w-5xl w-full shadow-2xl max-h-[92vh] flex flex-col text-xs">
+        <?= csrf_field() ?>
+        <input type="hidden" name="data" id="i_data">
+
+        <div class="flex justify-between items-center border-b p-5">
+            <h3 class="font-bold text-slate-800 text-base"><i class="fa-solid fa-file-excel text-emerald-600 mr-2"></i>Import Data Sekolah dari Excel</h3>
+            <button type="button" onclick="closeModal('modalImport')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <div class="overflow-y-auto p-5 space-y-4">
+            <!-- Langkah 1 & 2 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="border rounded-xl p-4 space-y-2">
+                    <div class="font-bold text-slate-800"><span class="bg-emerald-600 text-white w-5 h-5 inline-flex items-center justify-center rounded-full mr-1.5 text-[10px]">1</span>Unduh template</div>
+                    <p class="text-slate-500">Salin data sekolah ke template ini. Kolomnya sama dengan form Tambah Sekolah.</p>
+                    <button type="button" onclick="unduhTemplate()" class="border border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-semibold px-3 py-2 rounded-lg">
+                        <i class="fa-solid fa-download mr-1.5"></i>Unduh Template Excel
+                    </button>
+                </div>
+                <div class="border rounded-xl p-4 space-y-2">
+                    <div class="font-bold text-slate-800"><span class="bg-emerald-600 text-white w-5 h-5 inline-flex items-center justify-center rounded-full mr-1.5 text-[10px]">2</span>Pilih file yang sudah diisi</div>
+                    <input type="file" id="i_file" accept=".xlsx,.xls,.csv" onchange="bacaExcel(this)"
+                        class="w-full border border-slate-300 rounded-lg p-1.5 file:mr-2 file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:rounded">
+                    <p class="text-slate-400 text-[10px]">Format .xlsx, .xls, atau .csv. Data dibaca dari lembar (sheet) pertama.</p>
+                </div>
+            </div>
+
+            <!-- Pratinjau -->
+            <div id="i_pratinjau" class="hidden space-y-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-bold text-slate-800"><span class="bg-emerald-600 text-white w-5 h-5 inline-flex items-center justify-center rounded-full mr-1.5 text-[10px]">3</span>Pratinjau</span>
+                    <span id="i_jmlBaru" class="bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-full"></span>
+                    <span id="i_jmlUbah" class="bg-blue-100 text-blue-700 font-bold px-2.5 py-1 rounded-full"></span>
+                    <span id="i_jmlError" class="bg-red-100 text-red-700 font-bold px-2.5 py-1 rounded-full"></span>
+                </div>
+                <label class="flex items-center gap-2 cursor-pointer bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+                    <input type="checkbox" name="perbarui" value="1" id="i_perbarui" onchange="hitungRingkas()" class="accent-blue-600">
+                    <span>Perbarui data sekolah yang <b>NPSN-nya sudah terdaftar</b> (kalau tidak dicentang, sekolah tersebut dilewati)</span>
+                </label>
+                <div class="border rounded-xl overflow-auto max-h-[45vh]">
+                    <table class="w-full text-left text-[11px]">
+                        <thead class="bg-slate-100 text-slate-600 uppercase text-[10px] sticky top-0">
+                            <tr>
+                                <th class="p-2">Baris</th><th class="p-2">Status</th><th class="p-2">NPSN</th><th class="p-2">Nama Sekolah</th>
+                                <th class="p-2">Jenjang</th><th class="p-2">Kab/Kota</th><th class="p-2">Kecamatan</th><th class="p-2">Telepon</th>
+                            </tr>
+                        </thead>
+                        <tbody id="i_isi" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+                <p id="i_catatan" class="text-[10px] text-slate-400"></p>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center gap-2 border-t p-5 bg-slate-50 rounded-b-2xl">
+            <span class="text-[10px] text-slate-400">Baris yang error tidak ikut disimpan.</span>
+            <div class="flex gap-2">
+                <button type="button" onclick="closeModal('modalImport')" class="px-4 py-2 border rounded-lg font-semibold text-slate-600 bg-white">Batal</button>
+                <button type="submit" id="i_tombol" disabled class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg font-semibold">
+                    <i class="fa-solid fa-file-import mr-1"></i> <span id="i_tombolTeks">Import</span>
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- SheetJS: membaca & membuat file Excel langsung di browser -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+    const KAB_KOTA = <?= json_encode($kabKota) ?>;
+    const NPSN_ADA = new Set(<?= json_encode(array_map('strval', $npsnAda)) ?>);
+    const KOLOM = [
+        ['npsn', 'NPSN'], ['nama_sekolah', 'Nama Sekolah'], ['jenjang', 'Jenjang'], ['kabupaten_kota', 'Kabupaten/Kota'],
+        ['kecamatan', 'Kecamatan'], ['alamat', 'Alamat'], ['telepon', 'Telepon'], ['email', 'Email'], ['status', 'Status'],
+    ];
+    // Judul kolom lain yang juga dikenali (misalnya dari file Dinas)
+    const ALIAS = {
+        npsn: ['npsn'],
+        nama_sekolah: ['namasekolah', 'namasatuanpendidikan', 'nama'],
+        jenjang: ['jenjang', 'bentukpendidikan', 'bentuk'],
+        kabupaten_kota: ['kabupatenkota', 'kabkota', 'kabupaten', 'kota'],
+        kecamatan: ['kecamatan'],
+        alamat: ['alamat'],
+        telepon: ['telepon', 'nomortelepon', 'notelepon', 'telp'],
+        email: ['email', 'emailsekolah'],
+        status: ['status', 'statusaktif'],
+    };
+    let hasilBaca = [];
+
+    function bukaImport() {
+        document.getElementById('i_file').value = '';
+        document.getElementById('i_pratinjau').classList.add('hidden');
+        document.getElementById('i_tombol').disabled = true;
+        document.getElementById('i_tombolTeks').textContent = 'Import';
+        hasilBaca = [];
+        openModal('modalImport');
+    }
+
+    // ---------- Template ----------
+    function unduhTemplate() {
+        const isi = [
+            KOLOM.map(k => k[1]),
+            ['40400123', 'SMAN 1 Kendari', 'SMA', 'Kota Kendari', 'Mandonga', 'Jl. Contoh No. 1', '0401-123456', 'sman1kendari@contoh.sch.id', 'Aktif'],
+            ['40400456', 'SMKN 2 Kendari', 'SMK', 'Kota Kendari', 'Kadia', 'Jl. Contoh No. 2', '', '', 'Aktif'],
+        ];
+        const lembar = XLSX.utils.aoa_to_sheet(isi);
+        lembar['!cols'] = [12, 32, 9, 22, 18, 36, 16, 28, 10].map(w => ({ wch: w }));
+
+        const petunjuk = [
+            ['PETUNJUK PENGISIAN'],
+            ['• Hapus 2 baris contoh, lalu isi satu sekolah per baris mulai baris ke-2.'],
+            ['• NPSN wajib 8 karakter dan tidak boleh ganda.'],
+            ['• Kolom wajib: NPSN, Nama Sekolah, Jenjang, Kabupaten/Kota.'],
+            ['• Status: Aktif atau Nonaktif (kosong = Aktif).'],
+            [''],
+            ['Jenjang yang diterima'], ['SMA'], ['SMK'], ['SLB (SMALB/SMKLB juga dikenali)'],
+            [''],
+            ['Kabupaten/Kota yang diterima'], ...KAB_KOTA.map(k => [k]),
+        ];
+        const lembarPetunjuk = XLSX.utils.aoa_to_sheet(petunjuk);
+        lembarPetunjuk['!cols'] = [{ wch: 70 }];
+
+        const buku = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(buku, lembar, 'Data Sekolah');
+        XLSX.utils.book_append_sheet(buku, lembarPetunjuk, 'Petunjuk');
+        XLSX.writeFile(buku, 'template-data-sekolah.xlsx');
+    }
+
+    // ---------- Normalisasi (sama dengan di server) ----------
+    const inti = t => String(t || '').toLowerCase().trim().replace(/^(kabupaten|kab\.?|kota)\s*/, '').replace(/[^a-z]/g, '');
+    function normalisasiKab(teks) {
+        const cocok = KAB_KOTA.filter(k => inti(k) === inti(teks));
+        if (cocok.length > 1) {
+            const kota = /^\s*kota\b/i.test(teks);
+            return cocok.find(k => k.startsWith('Kota') === kota) || cocok[0];
+        }
+        return cocok[0] || null;
+    }
+    function normalisasiJenjang(teks) {
+        const t = String(teks || '').toUpperCase().replace(/[^A-Z]/g, '');
+        if (!t) return null;
+        if (t.includes('SLB') || t.includes('LB') || t.includes('LUARBIASA')) return 'SLB';
+        if (t.startsWith('SMK')) return 'SMK';
+        if (t.startsWith('SMA')) return 'SMA';
+        return null;
+    }
+
+    // ---------- Baca file ----------
+    function bacaExcel(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const pembaca = new FileReader();
+        pembaca.onload = e => {
+            try {
+                const buku = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                const baris = XLSX.utils.sheet_to_json(buku.Sheets[buku.SheetNames[0]], { header: 1, raw: false, defval: '' });
+                olahBaris(baris);
+            } catch (err) {
+                showToast('File tidak bisa dibaca', 'Pastikan file berformat Excel (.xlsx/.xls) atau CSV.', 'error');
+            }
+        };
+        pembaca.readAsArrayBuffer(file);
+    }
+
+    function olahBaris(baris) {
+        // Cari baris judul (yang memuat kolom NPSN)
+        const idxJudul = baris.findIndex(b => b.some(sel => String(sel).toLowerCase().replace(/[^a-z]/g, '') === 'npsn'));
+        if (idxJudul < 0) {
+            showToast('Kolom NPSN tidak ditemukan', 'Gunakan template Excel dari tombol Unduh Template.', 'error');
+            return;
+        }
+        const judul = baris[idxJudul].map(sel => String(sel).toLowerCase().replace(/[^a-z]/g, ''));
+        const posisi = {};
+        Object.entries(ALIAS).forEach(([kunci, daftar]) => {
+            const i = judul.findIndex(j => daftar.includes(j));
+            if (i >= 0) posisi[kunci] = i;
+        });
+
+        const dilihat = {};
+        hasilBaca = [];
+        baris.slice(idxJudul + 1).forEach((b, i) => {
+            if (!b.some(sel => String(sel).trim() !== '')) return; // lewati baris kosong
+            const nomor = idxJudul + i + 2;
+            const r = { baris: nomor };
+            KOLOM.forEach(([kunci]) => r[kunci] = posisi[kunci] !== undefined ? String(b[posisi[kunci]] ?? '').trim() : '');
+            r.npsn = r.npsn.replace(/\s+/g, '').toUpperCase();
+
+            const alasan = [];
+            if (!/^[0-9A-Z]{8}$/.test(r.npsn)) alasan.push('NPSN harus 8 karakter');
+            if (!r.nama_sekolah) alasan.push('nama kosong');
+            const jenjang = normalisasiJenjang(r.jenjang);
+            if (!jenjang) alasan.push('jenjang tidak dikenali');
+            const kab = normalisasiKab(r.kabupaten_kota);
+            if (!kab) alasan.push('kab/kota tidak dikenali');
+            if (dilihat[r.npsn]) alasan.push('NPSN ganda (baris ' + dilihat[r.npsn] + ')');
+            if (!alasan.length) dilihat[r.npsn] = nomor;
+
+            hasilBaca.push({ ...r, jenjang_ok: jenjang, kab_ok: kab, alasan, ada: NPSN_ADA.has(r.npsn) });
+        });
+
+        tampilPratinjau();
+    }
+
+    function tampilPratinjau() {
+        const isi = document.getElementById('i_isi');
+        isi.innerHTML = '';
+        const sel = (teks, kelas = '') => {
+            const td = document.createElement('td');
+            td.className = 'p-2 ' + kelas;
+            td.textContent = teks || '–';
+            return td;
+        };
+
+        hasilBaca.slice(0, 500).forEach(r => {
+            const tr = document.createElement('tr');
+            tr.className = r.alasan.length ? 'bg-red-50/60' : '';
+            const status = document.createElement('td');
+            status.className = 'p-2';
+            const badge = document.createElement('span');
+            badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ' +
+                (r.alasan.length ? 'bg-red-100 text-red-700' : (r.ada ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-800'));
+            badge.textContent = r.alasan.length ? 'Error' : (r.ada ? 'Perbarui' : 'Baru');
+            status.appendChild(badge);
+            if (r.alasan.length) {
+                const ket = document.createElement('div');
+                ket.className = 'text-[10px] text-red-600 mt-0.5';
+                ket.textContent = r.alasan.join(', ');
+                status.appendChild(ket);
+            }
+            tr.append(
+                sel(String(r.baris), 'text-slate-400'), status, sel(r.npsn, 'font-mono'), sel(r.nama_sekolah, 'font-semibold text-slate-800'),
+                sel(r.jenjang_ok || r.jenjang, r.jenjang_ok ? '' : 'text-red-600'),
+                sel(r.kab_ok || r.kabupaten_kota, r.kab_ok ? '' : 'text-red-600'),
+                sel(r.kecamatan), sel(r.telepon)
+            );
+            isi.appendChild(tr);
+        });
+
+        document.getElementById('i_catatan').textContent = hasilBaca.length > 500
+            ? 'Menampilkan 500 baris pertama dari ' + hasilBaca.length + ' baris. Semua baris tetap diproses saat import.'
+            : hasilBaca.length + ' baris terbaca.';
+        document.getElementById('i_pratinjau').classList.remove('hidden');
+        hitungRingkas();
+    }
+
+    function hitungRingkas() {
+        const valid = hasilBaca.filter(r => !r.alasan.length);
+        const baru = valid.filter(r => !r.ada).length;
+        const ubah = valid.filter(r => r.ada).length;
+        const error = hasilBaca.length - valid.length;
+        const perbarui = document.getElementById('i_perbarui').checked;
+
+        document.getElementById('i_jmlBaru').textContent = baru + ' baru';
+        document.getElementById('i_jmlUbah').textContent = ubah + (perbarui ? ' diperbarui' : ' sudah ada (dilewati)');
+        document.getElementById('i_jmlError').textContent = error + ' error';
+
+        const jumlah = baru + (perbarui ? ubah : 0);
+        document.getElementById('i_tombol').disabled = jumlah === 0;
+        document.getElementById('i_tombolTeks').textContent = 'Import ' + jumlah + ' sekolah';
+    }
+
+    function kirimImport() {
+        const valid = hasilBaca.filter(r => !r.alasan.length);
+        if (!valid.length) return false;
+        // Kirim data mentah; server memeriksa & menormalkan ulang
+        document.getElementById('i_data').value = JSON.stringify(valid.map(r => ({
+            baris: r.baris, npsn: r.npsn, nama_sekolah: r.nama_sekolah, jenjang: r.jenjang, kabupaten_kota: r.kabupaten_kota,
+            kecamatan: r.kecamatan, alamat: r.alamat, telepon: r.telepon, email: r.email, status: r.status,
+        })));
+        document.getElementById('i_tombol').disabled = true;
+        document.getElementById('i_tombolTeks').textContent = 'Menyimpan...';
+        return true;
+    }
 </script>
 <?= $this->endSection() ?>
