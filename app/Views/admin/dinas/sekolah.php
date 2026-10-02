@@ -4,6 +4,8 @@
 /** @var array $kabKota */
 /** @var array $ringkas */
 /** @var array $npsnAda */
+/** @var \CodeIgniter\Pager\Pager $pager */
+/** @var int $perHalaman */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
@@ -90,6 +92,7 @@ $laporan = session()->getFlashdata('laporanImport');
 
         <!-- Pencarian & filter -->
         <form method="get" action="<?= site_url('sekolah') ?>" class="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs">
+            <input type="hidden" name="per" value="<?= $perHalaman ?>">
             <input type="text" name="q" value="<?= esc($filter['q']) ?>" placeholder="Cari nama sekolah atau NPSN..."
                 class="md:col-span-2 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
             <select name="kab" class="border border-slate-300 rounded-lg p-2.5">
@@ -209,6 +212,69 @@ $laporan = session()->getFlashdata('laporanImport');
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Pagination -->
+            <?php
+            $grup     = 'sekolah';
+            $halaman  = $pager->getCurrentPage($grup);
+            $jmlHal   = $pager->getPageCount($grup);
+            $total    = $pager->getTotal($grup);
+            $dari     = ($halaman - 1) * $perHalaman + 1;
+            $sampai   = min($halaman * $perHalaman, $total);
+
+            // Nomor halaman yang ditampilkan: awal, akhir, dan 2 di sekitar halaman aktif
+            $nomor = [];
+            for ($n = 1; $n <= $jmlHal; $n++) {
+                if ($n === 1 || $n === $jmlHal || abs($n - $halaman) <= 2) {
+                    $nomor[] = $n;
+                }
+            }
+            $kelasTombol = 'min-w-[34px] h-[34px] px-2 rounded-lg border flex items-center justify-center font-semibold transition';
+            ?>
+            <div class="flex flex-wrap justify-between items-center gap-3 pt-2 text-xs">
+                <div class="flex items-center gap-3 text-slate-500">
+                    <span>Menampilkan <b class="text-slate-700"><?= number_format($dari, 0, ',', '.') ?>–<?= number_format($sampai, 0, ',', '.') ?></b> dari <b class="text-slate-700"><?= number_format($total, 0, ',', '.') ?></b> sekolah</span>
+                    <form method="get" action="<?= site_url('sekolah') ?>" class="flex items-center gap-1.5">
+                        <?php foreach ($filter as $kunci => $nilai) : ?>
+                            <?php if ($nilai !== '') : ?><input type="hidden" name="<?= $kunci ?>" value="<?= esc($nilai) ?>"><?php endif; ?>
+                        <?php endforeach; ?>
+                        <select name="per" onchange="this.form.submit()" class="border border-slate-300 rounded-lg p-1.5">
+                            <?php foreach ([10, 25, 50] as $opsi) : ?>
+                                <option value="<?= $opsi ?>" <?= $perHalaman === $opsi ? 'selected' : '' ?>><?= $opsi ?> / halaman</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </form>
+                </div>
+
+                <?php if ($jmlHal > 1) : ?>
+                    <nav class="flex items-center gap-1" aria-label="Halaman">
+                        <?php if ($halaman > 1) : ?>
+                            <a href="<?= $pager->getPageURI($halaman - 1, $grup) ?>" class="<?= $kelasTombol ?> border-slate-200 text-slate-600 hover:bg-slate-50" title="Sebelumnya"><i class="fa-solid fa-chevron-left text-[10px]"></i></a>
+                        <?php else : ?>
+                            <span class="<?= $kelasTombol ?> border-slate-100 text-slate-300"><i class="fa-solid fa-chevron-left text-[10px]"></i></span>
+                        <?php endif; ?>
+
+                        <?php $sebelumnya = 0; ?>
+                        <?php foreach ($nomor as $n) : ?>
+                            <?php if ($n - $sebelumnya > 1) : ?>
+                                <span class="px-1 text-slate-400">…</span>
+                            <?php endif; ?>
+                            <?php if ($n === $halaman) : ?>
+                                <span class="<?= $kelasTombol ?> bg-brand-600 border-brand-600 text-white" aria-current="page"><?= $n ?></span>
+                            <?php else : ?>
+                                <a href="<?= $pager->getPageURI($n, $grup) ?>" class="<?= $kelasTombol ?> border-slate-200 text-slate-600 hover:bg-slate-50"><?= $n ?></a>
+                            <?php endif; ?>
+                            <?php $sebelumnya = $n; ?>
+                        <?php endforeach; ?>
+
+                        <?php if ($halaman < $jmlHal) : ?>
+                            <a href="<?= $pager->getPageURI($halaman + 1, $grup) ?>" class="<?= $kelasTombol ?> border-slate-200 text-slate-600 hover:bg-slate-50" title="Berikutnya"><i class="fa-solid fa-chevron-right text-[10px]"></i></a>
+                        <?php else : ?>
+                            <span class="<?= $kelasTombol ?> border-slate-100 text-slate-300"><i class="fa-solid fa-chevron-right text-[10px]"></i></span>
+                        <?php endif; ?>
+                    </nav>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
     </div>

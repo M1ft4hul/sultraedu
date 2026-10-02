@@ -74,9 +74,17 @@ class Csekolah extends BaseController
             $builder->where('status', $filter['status']);
         }
 
+        // Pagination: 10 data per halaman (bisa 25 / 50)
+        $perHalaman = (int) $this->request->getGet('per');
+        if (! in_array($perHalaman, [10, 25, 50], true)) {
+            $perHalaman = 10;
+        }
+
         $data['sekolah'] = $builder->orderBy('kabupaten_kota', 'ASC')
             ->orderBy('nama_sekolah', 'ASC')
-            ->findAll();
+            ->paginate($perHalaman, 'sekolah');
+        $data['pager']      = $this->sekolah->pager;
+        $data['perHalaman'] = $perHalaman;
 
         $data['filter']  = $filter;
         $data['kabKota'] = self::KAB_KOTA;
