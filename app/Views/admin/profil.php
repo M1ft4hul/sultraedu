@@ -1,5 +1,4 @@
 <?php
-// ini latihan saya
 /** @var array $akun */
 /** @var bool $isGuru */
 /** @var string $nama */
@@ -26,47 +25,216 @@ $sejak = ! empty($akun['created_at'])
 ?>
 <section class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-    <!-- Kartu identitas -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="h-20 bg-gradient-to-r from-brand-800 to-slate-900"></div>
-        <div class="px-5 pb-5 -mt-10 text-center space-y-3">
-            <div class="mx-auto w-20 h-20 rounded-full bg-white p-1 shadow">
-                <div class="w-full h-full rounded-full bg-brand-600 text-white flex items-center justify-center text-2xl font-bold">
-                    <?= esc($inisial) ?>
+    <!-- Kolom kiri: identitas & video sekolah -->
+    <div class="space-y-6">
+        <!-- Kartu identitas -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="h-20 bg-gradient-to-r from-brand-800 to-slate-900"></div>
+            <div class="px-5 pb-5 -mt-10 text-center space-y-3">
+                <div class="mx-auto w-20 h-20 rounded-full bg-white p-1 shadow">
+                    <div class="w-full h-full rounded-full bg-brand-600 text-white flex items-center justify-center text-2xl font-bold">
+                        <?= esc($inisial) ?>
+                    </div>
                 </div>
-            </div>
-            <div>
-                <h2 class="font-bold text-slate-800 text-base"><?= esc($nama) ?></h2>
-                <p class="text-xs text-slate-400 font-mono">@<?= esc($akun['username']) ?></p>
-            </div>
-            <span class="inline-block bg-brand-50 text-brand-700 text-[11px] font-bold px-3 py-1 rounded-full"><?= esc($labelRole) ?></span>
+                <div>
+                    <h2 class="font-bold text-slate-800 text-base"><?= esc($nama) ?></h2>
+                    <p class="text-xs text-slate-400 font-mono">@<?= esc($akun['username']) ?></p>
+                </div>
+                <span class="inline-block bg-brand-50 text-brand-700 text-[11px] font-bold px-3 py-1 rounded-full"><?= esc($labelRole) ?></span>
 
-            <div class="text-left text-xs border-t pt-4 space-y-2.5">
-                <?php if ($sekolah) : ?>
-                    <div class="flex gap-3">
-                        <i class="fa-solid fa-school text-slate-400 w-4 mt-0.5"></i>
-                        <div>
-                            <div class="font-semibold text-slate-700"><?= esc($sekolah['nama_sekolah']) ?></div>
-                            <div class="text-[11px] text-slate-400">NPSN <?= esc($sekolah['npsn']) ?> • <?= esc($sekolah['kabupaten_kota']) ?></div>
+                <div class="text-left text-xs border-t pt-4 space-y-2.5">
+                    <?php if ($sekolah) : ?>
+                        <div class="flex gap-3">
+                            <i class="fa-solid fa-school text-slate-400 w-4 mt-0.5"></i>
+                            <div>
+                                <div class="font-semibold text-slate-700"><?= esc($sekolah['nama_sekolah']) ?></div>
+                                <div class="text-[11px] text-slate-400">NPSN <?= esc($sekolah['npsn']) ?> • <?= esc($sekolah['kabupaten_kota']) ?></div>
+                            </div>
                         </div>
-                    </div>
-                <?php endif; ?>
-                <?php if (! $isGuru && ! empty($akun['email'])) : ?>
+                    <?php endif; ?>
+                    <?php if (! $isGuru && ! empty($akun['email'])) : ?>
+                        <div class="flex gap-3">
+                            <i class="fa-solid fa-envelope text-slate-400 w-4 mt-0.5"></i>
+                            <span class="text-slate-600 break-all"><?= esc($akun['email']) ?></span>
+                        </div>
+                    <?php endif; ?>
                     <div class="flex gap-3">
-                        <i class="fa-solid fa-envelope text-slate-400 w-4 mt-0.5"></i>
-                        <span class="text-slate-600 break-all"><?= esc($akun['email']) ?></span>
+                        <i class="fa-solid fa-calendar text-slate-400 w-4 mt-0.5"></i>
+                        <span class="text-slate-600">Bergabung sejak <?= $sejak ?></span>
                     </div>
-                <?php endif; ?>
-                <div class="flex gap-3">
-                    <i class="fa-solid fa-calendar text-slate-400 w-4 mt-0.5"></i>
-                    <span class="text-slate-600">Bergabung sejak <?= $sejak ?></span>
-                </div>
-                <div class="flex gap-3">
-                    <i class="fa-solid fa-circle-check text-emerald-500 w-4 mt-0.5"></i>
-                    <span class="text-slate-600">Akun <?= esc($akun['status'] ?? 'aktif') ?></span>
+                    <div class="flex gap-3">
+                        <i class="fa-solid fa-circle-check text-emerald-500 w-4 mt-0.5"></i>
+                        <span class="text-slate-600">Akun <?= esc($akun['status'] ?? 'aktif') ?></span>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <?php if (session()->get('role') === 'admin_sekolah' && $sekolah) : ?>
+            <?php
+            $video      = $sekolah['video_profil'] ?? null;
+            $idYoutube  = \App\Controllers\Cprofil::idYoutube($video);
+            $diperbarui = ! empty($sekolah['video_diperbarui'])
+                ? date('j', strtotime($sekolah['video_diperbarui'])) . ' ' . $bulan[(int) date('n', strtotime($sekolah['video_diperbarui']))] . ' ' . date('Y', strtotime($sekolah['video_diperbarui']))
+                : null;
+            $maksMb = \App\Controllers\Cprofil::VIDEO_MAKS_MB;
+            ?>
+            <!-- Video profil sekolah (khusus Admin Sekolah) -->
+            <div id="video" class="bg-white rounded-2xl border <?= $video ? 'border-slate-200' : 'border-red-200' ?> shadow-sm overflow-hidden text-xs">
+                <div class="px-5 pt-5 flex justify-between items-start gap-2">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-film text-red-500 mr-2"></i>Video Profil Sekolah</h3>
+                        <p class="text-slate-400 mt-0.5">Wajib diunggah oleh setiap sekolah.</p>
+                    </div>
+                    <?php if ($video) : ?>
+                        <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"><i class="fa-solid fa-check mr-1"></i>Sudah ada</span>
+                    <?php else : ?>
+                        <span class="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">Wajib</span>
+                    <?php endif; ?>
+                </div>
+
+                <div class="p-5 space-y-3">
+                    <?php if (session()->getFlashdata('gagalVideo')) : ?>
+                        <div class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg"><?= esc(session()->getFlashdata('gagalVideo')) ?></div>
+                    <?php endif; ?>
+
+                    <?php if ($video) : ?>
+                        <!-- Pemutar -->
+                        <div class="aspect-video rounded-xl overflow-hidden bg-slate-900">
+                            <?php if ($idYoutube) : ?>
+                                <iframe src="https://www.youtube.com/embed/<?= esc($idYoutube, 'attr') ?>" class="w-full h-full" title="Video profil sekolah" allowfullscreen
+                                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+                            <?php else : ?>
+                                <video src="<?= base_url($video) ?>" controls preload="metadata" class="w-full h-full"></video>
+                            <?php endif; ?>
+                        </div>
+                        <p class="text-[11px] text-slate-400">
+                            <i class="fa-<?= $idYoutube ? 'brands fa-youtube text-red-500' : 'solid fa-file-video' ?> mr-1"></i>
+                            <?= $idYoutube ? 'Tautan YouTube' : 'File video' ?><?= $diperbarui ? ' • diperbarui ' . $diperbarui : '' ?>
+                        </p>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="document.getElementById('formVideo').classList.toggle('hidden')"
+                                class="flex-1 border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold px-3 py-2 rounded-lg">
+                                <i class="fa-solid fa-arrows-rotate mr-1.5"></i>Ganti Video
+                            </button>
+                            <form action="<?= site_url('profil/video/hapus') ?>" method="post" onsubmit="return confirm('Hapus video profil sekolah?')">
+                                <?= csrf_field() ?>
+                                <button type="submit" title="Hapus video" class="h-full border border-red-200 hover:bg-red-50 text-red-600 font-semibold px-3 py-2 rounded-lg">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    <?php else : ?>
+                        <div class="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 flex gap-2">
+                            <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+                            <span>Sekolah Anda belum memiliki video profil. Unggah video singkat yang memperkenalkan sekolah.</span>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- Form unggah / ganti -->
+                    <form id="formVideo" action="<?= site_url('profil/video') ?>" method="post" enctype="multipart/form-data"
+                        onsubmit="return unggahVideo(event)" class="<?= $video ? 'hidden' : '' ?> border border-dashed border-slate-300 rounded-xl p-3 space-y-3">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="jenis" id="v_jenis" value="file">
+
+                        <div class="grid grid-cols-2 gap-1 bg-slate-100 rounded-lg p-1 font-semibold">
+                            <button type="button" id="v_tabFile" onclick="pilihJenisVideo('file')" class="py-1.5 rounded-md bg-white shadow-sm text-slate-800"><i class="fa-solid fa-upload mr-1"></i>Unggah File</button>
+                            <button type="button" id="v_tabYoutube" onclick="pilihJenisVideo('youtube')" class="py-1.5 rounded-md text-slate-500"><i class="fa-brands fa-youtube mr-1"></i>Tautan YouTube</button>
+                        </div>
+
+                        <div id="v_blokFile" class="space-y-1">
+                            <input type="file" name="video" id="v_file" accept="video/mp4,video/webm"
+                                class="w-full border border-slate-300 rounded-lg p-1.5 file:mr-2 file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:rounded">
+                            <p class="text-[10px] text-slate-400">MP4 atau WEBM, maksimal <?= $maksMb ?> MB. Video lebih besar sebaiknya diunggah ke YouTube.</p>
+                        </div>
+                        <div id="v_blokYoutube" class="hidden space-y-1">
+                            <input type="url" name="url_youtube" id="v_url" placeholder="https://youtu.be/..." class="w-full border border-slate-300 rounded-lg p-2">
+                            <p class="text-[10px] text-slate-400">Pastikan video di YouTube berstatus Publik atau Tidak Publik (unlisted).</p>
+                        </div>
+
+                        <!-- Progres unggah -->
+                        <div id="v_progres" class="hidden space-y-1">
+                            <div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div id="v_bar" class="h-full bg-red-500 rounded-full transition-all" style="width:0%"></div></div>
+                            <p id="v_persen" class="text-[10px] text-slate-500 text-center">0%</p>
+                        </div>
+                        <p id="v_pesan" class="hidden text-red-600"></p>
+
+                        <button type="submit" id="v_tombol" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold px-3 py-2 rounded-lg">
+                            <i class="fa-solid fa-cloud-arrow-up mr-1.5"></i><?= $video ? 'Simpan Video Baru' : 'Unggah Video' ?>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <script>
+                const VIDEO_MAKS_MB = <?= (int) $maksMb ?>;
+
+                function pilihJenisVideo(jenis) {
+                    document.getElementById('v_jenis').value = jenis;
+                    document.getElementById('v_blokFile').classList.toggle('hidden', jenis !== 'file');
+                    document.getElementById('v_blokYoutube').classList.toggle('hidden', jenis !== 'youtube');
+                    document.getElementById('v_tabFile').className = 'py-1.5 rounded-md ' + (jenis === 'file' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500');
+                    document.getElementById('v_tabYoutube').className = 'py-1.5 rounded-md ' + (jenis === 'youtube' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500');
+                }
+
+                function pesanVideo(teks) {
+                    const p = document.getElementById('v_pesan');
+                    p.textContent = teks;
+                    p.classList.toggle('hidden', !teks);
+                }
+
+                // Unggah dengan bar progres (video bisa berukuran besar)
+                function unggahVideo(e) {
+                    e.preventDefault();
+                    const form = document.getElementById('formVideo');
+                    const jenis = document.getElementById('v_jenis').value;
+                    pesanVideo('');
+
+                    if (jenis === 'file') {
+                        const file = document.getElementById('v_file').files[0];
+                        if (!file) return pesanVideo('Pilih file video terlebih dulu.'), false;
+                        if (file.size > VIDEO_MAKS_MB * 1024 * 1024) return pesanVideo('Ukuran video melebihi ' + VIDEO_MAKS_MB + ' MB. Unggah ke YouTube lalu gunakan tab Tautan YouTube.'), false;
+                    } else if (!document.getElementById('v_url').value.trim()) {
+                        return pesanVideo('Tempel tautan video YouTube terlebih dulu.'), false;
+                    }
+
+                    const tombol = document.getElementById('v_tombol');
+                    tombol.disabled = true;
+                    tombol.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Mengunggah...';
+                    document.getElementById('v_progres').classList.toggle('hidden', jenis !== 'file');
+
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', form.action);
+                    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                    xhr.upload.onprogress = ev => {
+                        if (!ev.lengthComputable) return;
+                        const persen = Math.round(ev.loaded / ev.total * 100);
+                        document.getElementById('v_bar').style.width = persen + '%';
+                        document.getElementById('v_persen').textContent = persen < 100 ? persen + '%' : 'Memproses video...';
+                    };
+                    xhr.onload = () => {
+                        let data = {};
+                        try { data = JSON.parse(xhr.responseText); } catch (err) {}
+                        if (xhr.status === 200 && data.ok) {
+                            location.href = '<?= site_url('profil') ?>#video';
+                            location.reload();
+                        } else {
+                            pesanVideo(data.pesan || 'Video gagal diunggah. Periksa ukuran file lalu coba lagi.');
+                            tombol.disabled = false;
+                            tombol.innerHTML = '<i class="fa-solid fa-cloud-arrow-up mr-1.5"></i>Coba Lagi';
+                            document.getElementById('v_progres').classList.add('hidden');
+                        }
+                    };
+                    xhr.onerror = () => {
+                        pesanVideo('Koneksi terputus saat mengunggah. Coba lagi.');
+                        tombol.disabled = false;
+                        tombol.innerHTML = '<i class="fa-solid fa-cloud-arrow-up mr-1.5"></i>Coba Lagi';
+                    };
+                    xhr.send(new FormData(form));
+                    return false;
+                }
+            </script>
+        <?php endif; ?>
     </div>
 
     <div class="lg:col-span-2 space-y-6">
@@ -145,13 +313,11 @@ $sejak = ! empty($akun['created_at'])
                 </div>
             <?php endif; ?>
 
-            <?php foreach (
-                [
-                    ['password_lama', 'Password Lama', 'current-password'],
-                    ['password_baru', 'Password Baru', 'new-password'],
-                    ['konfirmasi_password', 'Ulangi Password Baru', 'new-password'],
-                ] as [$nm, $label, $auto]
-            ) : ?>
+            <?php foreach ([
+                ['password_lama', 'Password Lama', 'current-password'],
+                ['password_baru', 'Password Baru', 'new-password'],
+                ['konfirmasi_password', 'Ulangi Password Baru', 'new-password'],
+            ] as [$nm, $label, $auto]) : ?>
                 <div>
                     <label class="font-semibold block mb-1 text-slate-700"><?= $label ?></label>
                     <div class="relative">
@@ -209,27 +375,18 @@ $sejak = ! empty($akun['created_at'])
                             </button>
                         </div>
                         <div class="grid grid-cols-3 gap-2">
-                            <div class="bg-slate-50 rounded-lg p-2.5">
-                                <div class="text-[10px] text-slate-400 uppercase">Nama</div>
-                                <div class="font-semibold"><?= esc($akunBaru['nama']) ?></div>
-                            </div>
-                            <div class="bg-slate-50 rounded-lg p-2.5">
-                                <div class="text-[10px] text-slate-400 uppercase">Username</div>
-                                <div class="font-mono font-semibold"><?= esc($akunBaru['username']) ?></div>
-                            </div>
-                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
-                                <div class="text-[10px] text-emerald-600 uppercase">Password</div>
-                                <div class="font-mono font-bold text-emerald-800"><?= esc($akunBaru['password']) ?></div>
-                            </div>
+                            <div class="bg-slate-50 rounded-lg p-2.5"><div class="text-[10px] text-slate-400 uppercase">Nama</div><div class="font-semibold"><?= esc($akunBaru['nama']) ?></div></div>
+                            <div class="bg-slate-50 rounded-lg p-2.5"><div class="text-[10px] text-slate-400 uppercase">Username</div><div class="font-mono font-semibold"><?= esc($akunBaru['username']) ?></div></div>
+                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5"><div class="text-[10px] text-emerald-600 uppercase">Password</div><div class="font-mono font-bold text-emerald-800"><?= esc($akunBaru['password']) ?></div></div>
                         </div>
                         <textarea id="teksAkunTim" class="hidden"><?= esc(
-                                                                        "Akun EDUVATION - {$labelTim}\n" .
-                                                                            "Nama     : {$akunBaru['nama']}\n" .
-                                                                            "Username : {$akunBaru['username']}\n" .
-                                                                            "Password : {$akunBaru['password']}\n" .
-                                                                            "Login di : {$akunBaru['url']}\n\n" .
-                                                                            "Segera ganti password setelah login pertama melalui menu Profil Saya."
-                                                                    ) ?></textarea>
+                            "Akun EDUVATION - {$labelTim}\n" .
+                            "Nama     : {$akunBaru['nama']}\n" .
+                            "Username : {$akunBaru['username']}\n" .
+                            "Password : {$akunBaru['password']}\n" .
+                            "Login di : {$akunBaru['url']}\n\n" .
+                            "Segera ganti password setelah login pertama melalui menu Profil Saya."
+                        ) ?></textarea>
                     </div>
                 <?php endif; ?>
 

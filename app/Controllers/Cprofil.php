@@ -65,7 +65,7 @@ class Cprofil extends BaseController
         $sekolah = null;
         if (! empty($akun['id_sekolah'])) {
             $sekolah = \Config\Database::connect()->table('sekolah')
-                ->select('nama_sekolah, npsn, kabupaten_kota')
+                ->select('nama_sekolah, npsn, kabupaten_kota, video_profil, video_diperbarui')
                 ->where('id_sekolah', $akun['id_sekolah'])
                 ->get()->getRowArray();
         }
@@ -296,5 +296,116 @@ class Cprofil extends BaseController
         (new AdminModel())->update($id, ['status' => $statusBaru]);
 
         return redirect()->to($kembali)->with('sukses', 'Akun ' . esc($akun['nama_admin']) . ' sekarang ' . $statusBaru . '.');
+    }
+
+    // =====================================================
+    // VIDEO PROFIL SEKOLAH (khusus Admin Sekolah)
+    // =====================================================
+    public const VIDEO_MAKS_MB = 100;
+    private const VIDEO_FOLDER = 'uploads/video_sekolah/';
+
+    // Ambil ID video YouTube dari berbagai bentuk tautan
+    public static function idYoutube(?string $url): ?string
+    {
+        if ($url && preg_match('#(?:youtu\.be/|youtube\.com/(?:watch\?v=|shorts/|embed/|live/))([A-Za-z0-9_-]{11})#', $url, $m)) {
+            return $m[1];
+        }
+
+        return null;
+    }
+
+    // Balasan untuk unggahan lewat AJAX (bar progres) maupun form biasa
+    private function balasVideo(bool $berhasil, string $pesan)
+    {
+        if ($this->request->isAJAX()) {
+            if ($berhasil) {
+                session()->setFlashdata('sukses', $pesan); // tampil setelah halaman dimuat ulang
+            }
+
+            return $this->response->setStatusCode($berhasil ? 200 : 422)
+                ->setJSON(['ok' => $berhasil, 'pesan' => $pesan]);
+        }
+
+        return redirect()->to(site_url('profil') . '#video')->with($berhasil ? 'sukses' : 'gagalVideo', $pesan);
+    }
+
+    private function hapusFileVideo(?string $path): void
+    {
+        if ($path && ! preg_match('#^https?://#i', $path) && is_file(FCPATH . $path)) {
+            @unlink(FCPATH . $path);
+        }
+    }
+
+    public function video()
+    {
+        if (! session()->get('logged_in') || session()->get('role') !== 'admin_sekolah') {
+            return redirect()->to('dashboard');
+        }
+
+        $db        = \Config\Database::connect();
+        $idSekolah = (int) session()->get('id_sekolah');
+        $lama      = $db->table('sekolah')->select('video_profil')->where('id_sekolah', $idSekolah)->get()->getRow('video_profil');
+        $jenis     = $this->request->getPost('jenis') === 'youtube' ? 'youtube' : 'file';
+
+        if ($jenis === 'youtube') {
+            $id = self::idYoutube(trim((string) $this->request->getPost('url_youtube')));
+            if (! $id) {
+                return $this->balasVideo(false, 'Tautan YouTube tidak dikenali. Contoh: https://youtu.be/xxxxxxxxxxx');
+            }
+            $baru = 'https://www.youtube.com/watch?v=' . $id;
+        } else {
+            $file = $this->request->getFile('video');
+            if (! $file || $file->getError() === UPLOAD_ERR_NO_FILE) {
+                return $this->balasVideo(false, 'Pilih file video terlebih dulu.');
+            }
+            if (in_array($file->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                return $this->balasVideo(false, 'Ukuran video melebihi batas server. Gunakan video maksimal ' . self::VIDEO_MAKS_MB . ' MB atau unggah ke YouTube.');
+            }
+            if (! $file->isValid()) {
+                return $this->balasVideo(false, 'Video gagal diunggah. Coba lagi.');
+            }
+            if (! in_array(strtolower($file->getClientExtension()), ['mp4', 'webm'], true)
+                || ! str_starts_with((string) $file->getMimeType(), 'video/')) {
+                return $this->balasVideo(false, 'Format video harus MP4 atau WEBM.');
+            }
+            if ($file->getSizeByUnit('mb') > self::VIDEO_MAKS_MB) {
+                return $this->balasVideo(false, 'Ukuran video maksimal ' . self::VIDEO_MAKS_MB . ' MB.');
+            }
+
+            if (! is_dir(FCPATH . self::VIDEO_FOLDER)) {
+                mkdir(FCPATH . self::VIDEO_FOLDER, 0755, true);
+            }
+            $nama = $file->getRandomName();
+            $file->move(FCPATH . self::VIDEO_FOLDER, $nama);
+            $baru = self::VIDEO_FOLDER . $nama;
+        }
+
+        $db->table('sekolah')->where('id_sekolah', $idSekolah)->update([
+            'video_profil'     => $baru,
+            'video_diperbarui' => date('Y-m-d H:i:s'),
+        ]);
+
+        // File lama dihapus setelah video baru tersimpan
+        if ($lama && $lama !== $baru) {
+            $this->hapusFileVideo($lama);
+        }
+
+        return $this->balasVideo(true, $lama ? 'Video profil sekolah berhasil diganti.' : 'Video profil sekolah berhasil diunggah.');
+    }
+
+    public function hapusVideo()
+    {
+        if (! session()->get('logged_in') || session()->get('role') !== 'admin_sekolah') {
+            return redirect()->to('dashboard');
+        }
+
+        $db        = \Config\Database::connect();
+        $idSekolah = (int) session()->get('id_sekolah');
+        $lama      = $db->table('sekolah')->select('video_profil')->where('id_sekolah', $idSekolah)->get()->getRow('video_profil');
+
+        $db->table('sekolah')->where('id_sekolah', $idSekolah)->update(['video_profil' => null, 'video_diperbarui' => null]);
+        $this->hapusFileVideo($lama);
+
+        return redirect()->to(site_url('profil') . '#video')->with('sukses', 'Video profil sekolah dihapus. Jangan lupa unggah video pengganti.');
     }
 }

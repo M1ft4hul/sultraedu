@@ -100,3 +100,6 @@ $routes->get('rekap-penilaian/export/(:num)', 'Crekap::export/$1');
 $routes->get('lomba/(:num)', 'Clomba::detail/$1');
 
 $routes->post('sekolah/import', 'Csekolah::import');
+
+$routes->post('profil/video', 'Cprofil::video');
+$routes->post('profil/video/hapus', 'Cprofil::hapusVideo');
