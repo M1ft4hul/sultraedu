@@ -34,8 +34,8 @@ class Csuara extends BaseController
         ];
     }
 
-    // Query daftar SUARA lengkap dengan identitas pengirim
-    private function querySuara(array $filter): array
+    // Query dasar SUARA + filter (dipakai untuk menghitung total dan mengambil data)
+    private function builderSuara(array $filter)
     {
         $builder = \Config\Database::connect()->table('suara sr')
             ->select('sr.id_suara, sr.kategori, sr.isi_suara, sr.tanggal_kirim,
@@ -70,7 +70,17 @@ class Csuara extends BaseController
             $builder->where('sr.status_tindak_lanjut', $filter['status']);
         }
 
-        $data = $builder->orderBy('sr.tanggal_kirim', 'DESC')->get()->getResultArray();
+        return $builder;
+    }
+
+    // Daftar SUARA lengkap dengan identitas pengirim ($batas 0 = semua, untuk unduh Excel)
+    private function querySuara(array $filter, int $batas = 0, int $mulai = 0): array
+    {
+        $builder = $this->builderSuara($filter)->orderBy('sr.tanggal_kirim', 'DESC');
+        if ($batas > 0) {
+            $builder->limit($batas, $mulai);
+        }
+        $data = $builder->get()->getResultArray();
 
         // Nama tampilan: pakai nama guru kalau pengirimnya guru terdaftar
         foreach ($data as &$d) {
@@ -224,9 +234,23 @@ class Csuara extends BaseController
         }
         $ringkas['belum'] = $db->table('suara')->where('status_tindak_lanjut', 'belum_ditindak')->countAllResults();
 
+        // Pagination: 10 data per halaman (bisa 25 / 50)
+        $perHalaman = (int) $this->request->getGet('per');
+        if (! in_array($perHalaman, [10, 25, 50], true)) {
+            $perHalaman = 10;
+        }
+        $total   = $this->builderSuara($filter)->countAllResults();
+        $jmlHal  = max(1, (int) ceil($total / $perHalaman));
+        $halaman = min(max(1, (int) $this->request->getGet('page_suara')), $jmlHal);
+
+        $pager = service('pager');
+        $pager->store('suara', $halaman, $perHalaman, $total);
+
         return view('admin/dinas/suara', [
-            'suara'    => $this->querySuara($filter),
-            'filter'   => $filter,
+            'suara'      => $this->querySuara($filter, $perHalaman, ($halaman - 1) * $perHalaman),
+            'pager'      => $pager,
+            'perHalaman' => $perHalaman,
+            'filter'     => $filter,
             'ringkas'  => $ringkas,
             'kategori' => self::KATEGORI,
             'status'   => self::STATUS,

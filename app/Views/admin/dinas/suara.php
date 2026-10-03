@@ -1,5 +1,4 @@
 <?php
-
 /** @var array $suara */
 /** @var array $filter */
 /** @var array $ringkas */
@@ -7,6 +6,8 @@
 /** @var array $status */
 /** @var array $kabKota */
 /** @var array $sekolah */
+/** @var \CodeIgniter\Pager\Pager $pager */
+/** @var int $perHalaman */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
@@ -26,7 +27,7 @@ $gayaStatus = [
 ];
 
 $bulan = [1 => 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-$tgl   = fn($d) => date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', strtotime($d))] . ' ' . date('Y, H:i', strtotime($d));
+$tgl   = fn ($d) => date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', strtotime($d))] . ' ' . date('Y, H:i', strtotime($d));
 
 $adaFilter = array_filter($filter);
 ?>
@@ -92,18 +93,13 @@ $adaFilter = array_filter($filter);
         <!-- Filter -->
         <form method="get" action="<?= site_url('suara') ?>" class="grid grid-cols-1 md:grid-cols-6 gap-3 text-xs">
             <input type="hidden" name="kategori" value="<?= esc($filter['kategori']) ?>">
+            <input type="hidden" name="per" value="<?= $perHalaman ?>">
             <input type="text" name="q" value="<?= esc($filter['q']) ?>" placeholder="Cari isi, nama pengirim, atau sekolah..."
                 class="md:col-span-1 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
             <select name="status" class="border border-slate-300 rounded-lg p-2.5">
                 <option value="">Semua status</option>
                 <?php foreach ($status as $kunci => $teks) : ?>
                     <option value="<?= $kunci ?>" <?= $filter['status'] === $kunci ? 'selected' : '' ?>><?= esc($teks) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <select name="kab" class="border border-slate-300 rounded-lg p-2.5">
-                <option value="">Semua Kab/Kota</option>
-                <?php foreach ($kabKota as $k) : ?>
-                    <option value="<?= esc($k) ?>" <?= $filter['kab'] === $k ? 'selected' : '' ?>><?= esc($k) ?></option>
                 <?php endforeach; ?>
             </select>
             <div class="md:col-span-2 flex gap-2">
@@ -122,7 +118,6 @@ $adaFilter = array_filter($filter);
             </div>
         </form>
 
-        <p class="text-[11px] text-slate-500"><?= count($suara) ?> SUARA ditampilkan<?= $adaFilter ? ' sesuai filter' : '' ?>.</p>
 
         <!-- Daftar -->
         <?php if (empty($suara)) : ?>
@@ -176,6 +171,67 @@ $adaFilter = array_filter($filter);
                         </div>
                     </button>
                 <?php endforeach; ?>
+            </div>
+
+            <!-- Pagination -->
+            <?php
+            $grup    = 'suara';
+            $halaman = $pager->getCurrentPage($grup);
+            $jmlHal  = $pager->getPageCount($grup);
+            $total   = $pager->getTotal($grup);
+            $dari    = ($halaman - 1) * $perHalaman + 1;
+            $sampai  = min($halaman * $perHalaman, $total);
+
+            // Halaman pertama, terakhir, dan 2 di sekitar halaman aktif
+            $nomor = [];
+            for ($n = 1; $n <= $jmlHal; $n++) {
+                if ($n === 1 || $n === $jmlHal || abs($n - $halaman) <= 2) {
+                    $nomor[] = $n;
+                }
+            }
+            $kelasTombol = 'min-w-[34px] h-[34px] px-2 rounded-lg border flex items-center justify-center font-semibold transition';
+            ?>
+            <div class="flex flex-wrap justify-between items-center gap-3 pt-2 text-xs">
+                <div class="flex items-center gap-3 text-slate-500">
+                    <span>Menampilkan <b class="text-slate-700"><?= number_format($dari, 0, ',', '.') ?>–<?= number_format($sampai, 0, ',', '.') ?></b> dari <b class="text-slate-700"><?= number_format($total, 0, ',', '.') ?></b> SUARA<?= $adaFilter ? ' sesuai filter' : '' ?></span>
+                    <form method="get" action="<?= site_url('suara') ?>" class="flex items-center gap-1.5">
+                        <?php foreach ($filter as $kunci => $nilai) : ?>
+                            <?php if ($nilai !== '') : ?><input type="hidden" name="<?= $kunci ?>" value="<?= esc($nilai) ?>"><?php endif; ?>
+                        <?php endforeach; ?>
+                        <select name="per" onchange="this.form.submit()" class="border border-slate-300 rounded-lg p-1.5">
+                            <?php foreach ([10, 25, 50] as $opsi) : ?>
+                                <option value="<?= $opsi ?>" <?= $perHalaman === $opsi ? 'selected' : '' ?>><?= $opsi ?> / halaman</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </form>
+                </div>
+
+                <?php if ($jmlHal > 1) : ?>
+                    <nav class="flex items-center gap-1" aria-label="Halaman">
+                        <?php if ($halaman > 1) : ?>
+                            <a href="<?= $pager->getPageURI($halaman - 1, $grup) ?>" class="<?= $kelasTombol ?> border-slate-200 text-slate-600 hover:bg-slate-50" title="Sebelumnya"><i class="fa-solid fa-chevron-left text-[10px]"></i></a>
+                        <?php else : ?>
+                            <span class="<?= $kelasTombol ?> border-slate-100 text-slate-300"><i class="fa-solid fa-chevron-left text-[10px]"></i></span>
+                        <?php endif; ?>
+
+                        <?php $sebelumnya = 0; ?>
+                        <?php foreach ($nomor as $n) : ?>
+                            <?php if ($n - $sebelumnya > 1) : ?><span class="px-1 text-slate-400">…</span><?php endif; ?>
+                            <?php if ($n === $halaman) : ?>
+                                <span class="<?= $kelasTombol ?> bg-brand-600 border-brand-600 text-white" aria-current="page"><?= $n ?></span>
+                            <?php else : ?>
+                                <a href="<?= $pager->getPageURI($n, $grup) ?>" class="<?= $kelasTombol ?> border-slate-200 text-slate-600 hover:bg-slate-50"><?= $n ?></a>
+                            <?php endif; ?>
+                            <?php $sebelumnya = $n; ?>
+                        <?php endforeach; ?>
+
+                        <?php if ($halaman < $jmlHal) : ?>
+                            <a href="<?= $pager->getPageURI($halaman + 1, $grup) ?>" class="<?= $kelasTombol ?> border-slate-200 text-slate-600 hover:bg-slate-50" title="Berikutnya"><i class="fa-solid fa-chevron-right text-[10px]"></i></a>
+                        <?php else : ?>
+                            <span class="<?= $kelasTombol ?> border-slate-100 text-slate-300"><i class="fa-solid fa-chevron-right text-[10px]"></i></span>
+                        <?php endif; ?>
+                    </nav>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
     </div>
@@ -257,7 +313,7 @@ $adaFilter = array_filter($filter);
 <script>
     const LABEL_KATEGORI = <?= json_encode($kategori) ?>;
     const LABEL_STATUS = <?= json_encode($status) ?>;
-    const GAYA_KATEGORI = <?= json_encode(array_map(fn($g) => $g[0], $gaya)) ?>;
+    const GAYA_KATEGORI  = <?= json_encode(array_map(fn ($g) => $g[0], $gaya)) ?>;
 
     function isi(id, teks) {
         document.getElementById(id).textContent = teks || '-';
@@ -269,13 +325,7 @@ $adaFilter = array_filter($filter);
         badge.textContent = LABEL_KATEGORI[d.kategori] || d.kategori;
 
         const t = new Date(d.tanggal_kirim.replace(' ', 'T'));
-        isi('s_tanggal', t.toLocaleString('id-ID', {
-            day: '2-digit',
-            month: 'long',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        }));
+        isi('s_tanggal', t.toLocaleString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
 
         isi('s_isi', d.isi_suara);
         isi('s_nama', d.pengirim);
@@ -286,10 +336,7 @@ $adaFilter = array_filter($filter);
         const jenis = document.getElementById('s_jenis');
         jenis.textContent = d.jenis_pengirim;
         jenis.className = 'text-[10px] px-2 py-0.5 rounded-full ml-1 ' +
-            ({
-                'Guru': 'bg-violet-50 text-violet-700',
-                'Admin Sekolah': 'bg-blue-50 text-blue-700'
-            } [d.jenis_pengirim] || 'bg-slate-100 text-slate-500');
+            ({ 'Guru': 'bg-violet-50 text-violet-700', 'Admin Sekolah': 'bg-blue-50 text-blue-700' }[d.jenis_pengirim] || 'bg-slate-100 text-slate-500');
 
         document.getElementById('s_nip_wrap').classList.toggle('hidden', !d.nip);
         isi('s_nip', d.nip);
@@ -299,15 +346,9 @@ $adaFilter = array_filter($filter);
         document.getElementById('s_balasanWrap').classList.toggle('hidden', !sudah);
         if (sudah) {
             isi('s_balasan', d.tanggapan);
-            const waktu = d.tanggal_tindak_lanjut ?
-                new Date(d.tanggal_tindak_lanjut.replace(' ', 'T')).toLocaleString('id-ID', {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                }) :
-                '';
+            const waktu = d.tanggal_tindak_lanjut
+                ? new Date(d.tanggal_tindak_lanjut.replace(' ', 'T')).toLocaleString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                : '';
             isi('s_penindak', (d.nama_penindak || 'Admin Dinas') + (waktu ? ' • ' + waktu : '') +
                 ' • ' + (LABEL_STATUS[d.status_tindak_lanjut] || ''));
         }
