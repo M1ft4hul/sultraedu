@@ -3,6 +3,8 @@
 /** @var string $status */
 /** @var array $jumlah */
 /** @var array $label */
+/** @var \CodeIgniter\Pager\Pager $pager */
+/** @var int $perHalaman */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
@@ -45,7 +47,7 @@ $tabs = ['' => 'Semua'] + $label;
         <!-- Tab status -->
         <div class="flex flex-wrap gap-2 border-b pb-3 text-xs font-semibold">
             <?php foreach ($tabs as $kunci => $teks) : ?>
-                <a href="<?= site_url('bank-inovasi') . ($kunci !== '' ? '?status=' . $kunci : '') ?>"
+                <a href="<?= site_url('bank-inovasi') . '?' . http_build_query(array_filter(['status' => $kunci, 'per' => $perHalaman !== 10 ? $perHalaman : ''])) ?>"
                     class="px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition
                            <?= $status === $kunci ? 'bg-brand-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' ?>">
                     <?= esc($teks) ?>
@@ -114,6 +116,8 @@ $tabs = ['' => 'Semua'] + $label;
                     </tbody>
                 </table>
             </div>
+
+            <?= view('admin/componen_be/pagination', ['pager' => $pager, 'grup' => 'inovasi', 'perHalaman' => $perHalaman, 'url' => site_url('bank-inovasi'), 'tahan' => ['status' => $status], 'satuan' => 'inovasi']) ?>
         <?php endif; ?>
     </div>
 </section>

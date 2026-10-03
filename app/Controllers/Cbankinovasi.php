@@ -30,6 +30,25 @@ class CbankInovasi extends BaseController
     // =====================================================
     // PINTU MASUK: pilih halaman sesuai role
     // =====================================================
+    // Jumlah data per halaman dari ?per= (10 / 25 / 50)
+    private function perHalaman(): int
+    {
+        $per = (int) $this->request->getGet('per');
+
+        return in_array($per, [10, 25, 50], true) ? $per : 10;
+    }
+
+    // Siapkan pager manual; mengembalikan [pager, halaman aktif]
+    private function siapkanPager(string $grup, int $perHalaman, int $total): array
+    {
+        $jmlHal  = max(1, (int) ceil($total / $perHalaman));
+        $halaman = min(max(1, (int) $this->request->getGet('page_' . $grup)), $jmlHal);
+        $pager   = service('pager');
+        $pager->store($grup, $halaman, $perHalaman, $total);
+
+        return [$pager, $halaman];
+    }
+
     public function index()
     {
         if (! session()->get('logged_in')) {
@@ -136,11 +155,6 @@ class CbankInovasi extends BaseController
             $builder->where('bi.status_verifikasi', $status);
         }
 
-        $inovasi = $builder
-            ->orderBy("bi.status_verifikasi = 'menunggu'", 'DESC', false)
-            ->orderBy('bi.created_at', 'DESC')
-            ->get()->getResultArray();
-
         $hitung = function ($st = null) use ($db) {
             $q = $db->table('bank_inovasi')->where('status_verifikasi_sekolah', 'disetujui');
             if ($st) {
@@ -155,7 +169,19 @@ class CbankInovasi extends BaseController
             $jumlah[$st] = $hitung($st);
         }
 
+        // Pagination (total = jumlah di tab aktif)
+        $perHalaman        = $this->perHalaman();
+        [$pager, $halaman] = $this->siapkanPager('inovasi', $perHalaman, $jumlah[$status]);
+
+        $inovasi = $builder
+            ->orderBy("bi.status_verifikasi = 'menunggu'", 'DESC', false)
+            ->orderBy('bi.created_at', 'DESC')
+            ->limit($perHalaman, ($halaman - 1) * $perHalaman)
+            ->get()->getResultArray();
+
         return view('admin/dinas/bank_inovasi', [
+            'pager'      => $pager,
+            'perHalaman' => $perHalaman,
             'inovasi' => $this->tempelLampiran($db, $inovasi),
             'status'  => $status,
             'jumlah'  => $jumlah,

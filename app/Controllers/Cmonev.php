@@ -26,6 +26,25 @@ class Cmonev extends BaseController
     // =====================================================
     // HALAMAN MONEV
     // =====================================================
+    // Jumlah data per halaman dari ?per= (10 / 25 / 50)
+    private function perHalaman(): int
+    {
+        $per = (int) $this->request->getGet('per');
+
+        return in_array($per, [10, 25, 50], true) ? $per : 10;
+    }
+
+    // Siapkan pager manual; mengembalikan [pager, halaman aktif]
+    private function siapkanPager(string $grup, int $perHalaman, int $total): array
+    {
+        $jmlHal  = max(1, (int) ceil($total / $perHalaman));
+        $halaman = min(max(1, (int) $this->request->getGet('page_' . $grup)), $jmlHal);
+        $pager   = service('pager');
+        $pager->store($grup, $halaman, $perHalaman, $total);
+
+        return [$pager, $halaman];
+    }
+
     public function index()
     {
         if (! session()->get('logged_in')) {
@@ -70,10 +89,10 @@ class Cmonev extends BaseController
         unset($m);
 
         // Ringkasan (tidak terpengaruh filter)
-        $jadwal  = array_filter($semua, fn($m) => $m['status'] === 'dijadwalkan');
-        $selesai = array_filter($semua, fn($m) => $m['status'] === 'selesai');
-        $mendatang = array_filter($jadwal, fn($m) => $m['tanggal_monev'] >= $hariIni);
-        usort($mendatang, fn($a, $b) => strcmp($a['tanggal_monev'], $b['tanggal_monev']));
+        $jadwal  = array_filter($semua, fn ($m) => $m['status'] === 'dijadwalkan');
+        $selesai = array_filter($semua, fn ($m) => $m['status'] === 'selesai');
+        $mendatang = array_filter($jadwal, fn ($m) => $m['tanggal_monev'] >= $hariIni);
+        usort($mendatang, fn ($a, $b) => strcmp($a['tanggal_monev'], $b['tanggal_monev']));
 
         $ringkas = [
             'jadwal'   => count($jadwal),
@@ -82,7 +101,7 @@ class Cmonev extends BaseController
         ];
 
         // ---------- Filter ----------
-        $daftarTahun = array_values(array_unique(array_map(fn($m) => substr($m['tanggal_monev'], 0, 4), $semua)));
+        $daftarTahun = array_values(array_unique(array_map(fn ($m) => substr($m['tanggal_monev'], 0, 4), $semua)));
         rsort($daftarTahun);
 
         $daftarKarya = [];
@@ -105,11 +124,10 @@ class Cmonev extends BaseController
             $filter['karya'] = '';
         }
 
-        $tampil = array_values(array_filter(
-            $semua,
-            fn($m) => ($filter['status'] === '' || ($filter['status'] === 'jadwal' ? $m['status'] === 'dijadwalkan' : $m['status'] === 'selesai'))
-                && ($filter['tahun'] === '' || substr($m['tanggal_monev'], 0, 4) === $filter['tahun'])
-                && ($filter['karya'] === '' || (string) $m['id_peserta'] === $filter['karya'])
+        $tampil = array_values(array_filter($semua, fn ($m) =>
+            ($filter['status'] === '' || ($filter['status'] === 'jadwal' ? $m['status'] === 'dijadwalkan' : $m['status'] === 'selesai'))
+            && ($filter['tahun'] === '' || substr($m['tanggal_monev'], 0, 4) === $filter['tahun'])
+            && ($filter['karya'] === '' || (string) $m['id_peserta'] === $filter['karya'])
         ));
 
         // Jadwal (terdekat dulu) di atas, lalu hasil (terbaru dulu)
@@ -180,14 +198,12 @@ class Cmonev extends BaseController
             $perKab[$r['kabupaten_kota']]['ikut']    = (int) $r['ikut'];
         }
 
-        foreach (
-            [
-                'praktik' => "SELECT s.kabupaten_kota, COUNT(*) AS n FROM praktik_baik pb JOIN sekolah s ON s.id_sekolah = pb.id_sekolah
+        foreach ([
+            'praktik' => "SELECT s.kabupaten_kota, COUNT(*) AS n FROM praktik_baik pb JOIN sekolah s ON s.id_sekolah = pb.id_sekolah
                           WHERE pb.status_verifikasi_dinas = 'disetujui' GROUP BY s.kabupaten_kota",
-                'inovasi' => "SELECT s.kabupaten_kota, COUNT(*) AS n FROM bank_inovasi bi JOIN sekolah s ON s.id_sekolah = bi.id_sekolah
+            'inovasi' => "SELECT s.kabupaten_kota, COUNT(*) AS n FROM bank_inovasi bi JOIN sekolah s ON s.id_sekolah = bi.id_sekolah
                           WHERE bi.status_verifikasi = 'disetujui' GROUP BY s.kabupaten_kota",
-            ] as $kunci => $sql
-        ) {
+        ] as $kunci => $sql) {
             foreach ($db->query($sql)->getResultArray() as $r) {
                 $perKab[$r['kabupaten_kota']][$kunci] = (int) $r['n'];
             }
@@ -208,9 +224,15 @@ class Cmonev extends BaseController
         if ($filterKompetisi !== '') {
             $builder->where('k.id_kompetisi', $filterKompetisi);
         }
+        // Pagination jadwal (hitung total tanpa mereset query)
+        $perHalaman        = $this->perHalaman();
+        $totalJadwal       = $builder->countAllResults(false);
+        [$pager, $halaman] = $this->siapkanPager('jadwal', $perHalaman, $totalJadwal);
+
         // Yang masih dijadwalkan di atas, lalu tanggal terdekat
         $jadwal = $builder->orderBy("m.status = 'dijadwalkan'", 'DESC', false)
             ->orderBy('m.tanggal_monev', 'ASC')
+            ->limit($perHalaman, ($halaman - 1) * $perHalaman)
             ->get()->getResultArray();
 
         // Kompetisi yang sudah diumumkan beserta pesertanya (untuk form)
@@ -237,6 +259,9 @@ class Cmonev extends BaseController
         }
 
         return view('admin/dinas/monev', [
+            'pager'       => $pager,
+            'perHalaman'  => $perHalaman,
+            'totalJadwal' => $totalJadwal,
             'indikator'       => $indikator,
             'perKab'          => $perKab,
             'jadwal'          => $jadwal,

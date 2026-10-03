@@ -1,5 +1,4 @@
 <?php
-
 /** @var array $indikator */
 /** @var array $perKab */
 /** @var array $jadwal */
@@ -8,6 +7,9 @@
 /** @var array $peserta */
 /** @var array $aspek */
 /** @var array $labelStatus */
+/** @var \CodeIgniter\Pager\Pager $pager */
+/** @var int $perHalaman */
+/** @var int $totalJadwal */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
@@ -15,8 +17,8 @@
 <?php
 $errors = session()->getFlashdata('errors') ?? [];
 $bulan  = [1 => 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-$tgl    = fn($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', strtotime($d))] . ' ' . date('Y', strtotime($d)) : '-';
-$n      = fn($x) => number_format((float) $x, 0, ',', '.');
+$tgl    = fn ($d) => $d ? date('j', strtotime($d)) . ' ' . $bulan[(int) date('n', strtotime($d))] . ' ' . date('Y', strtotime($d)) : '-';
+$n      = fn ($x) => number_format((float) $x, 0, ',', '.');
 $hariIni = date('Y-m-d');
 
 $kartu = [
@@ -112,13 +114,14 @@ $badgeJuara = [1 => 'bg-amber-100 text-amber-700', 2 => 'bg-slate-200 text-slate
             <div>
                 <h3 class="text-sm font-bold text-slate-800">
                     <i class="fa-solid fa-calendar-check text-brand-600 mr-2"></i>Jadwal Monitoring
-                    <span class="text-slate-400 font-normal">(<?= count($jadwal) ?>)</span>
+                    <span class="text-slate-400 font-normal">(<?= $totalJadwal ?>)</span>
                 </h3>
                 <p class="text-[11px] text-slate-400">Monitoring tindak lanjut untuk karya kompetisi yang dipilih Dinas.</p>
             </div>
             <div class="flex gap-2 text-xs">
                 <?php if ($kompetisi) : ?>
                     <form method="get" action="<?= site_url('monev') ?>#jadwal">
+                        <input type="hidden" name="per" value="<?= $perHalaman ?>">
                         <select name="kompetisi" onchange="this.form.submit()" class="border border-slate-300 rounded-lg p-2">
                             <option value="">Semua kompetisi</option>
                             <?php foreach ($kompetisi as $k) : ?>
@@ -170,7 +173,7 @@ $badgeJuara = [1 => 'bg-amber-100 text-amber-700', 2 => 'bg-slate-200 text-slate
                                         <span class="text-[10px] text-red-600 font-bold">Terlewat</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="p-3 min-w-[240px]">
+                                <td class="p-3">
                                     <div class="font-semibold text-slate-800">
                                         <?= esc($j['judul_karya']) ?>
                                         <?php if ($j['peringkat']) : ?>
@@ -181,10 +184,10 @@ $badgeJuara = [1 => 'bg-amber-100 text-amber-700', 2 => 'bg-slate-200 text-slate
                                         <?= esc($j['nama_sekolah'] ?? '-') ?> • <?= esc($j['nama_guru'] ?? '-') ?> • <?= esc($j['nama_kompetisi']) ?>
                                     </div>
                                 </td>
-                                <td class="p-3 max-w-[280px]">
-                                    <div class="font-medium text-slate-700 truncate"><?= esc($j['aspek_monev']) ?></div>
+                                <td class="p-3">
+                                    <div class="font-medium text-slate-700"><?= esc($j['aspek_monev']) ?></div>
                                     <?php if ($j['deskripsi']) : ?>
-                                        <div class="text-[11px] text-slate-400 truncate"><?= esc($j['deskripsi']) ?></div>
+                                        <div class="text-[11px] text-slate-400 line-clamp-1"><?= esc($j['deskripsi']) ?></div>
                                     <?php endif; ?>
                                 </td>
                                 <td class="p-3">
@@ -207,12 +210,8 @@ $badgeJuara = [1 => 'bg-amber-100 text-amber-700', 2 => 'bg-slate-200 text-slate
                                                 <i class="fa-solid fa-trash text-[11px]"></i>
                                             </button>
                                         <?php else : ?>
+                                            <span class="text-[11px] text-slate-400 italic">Hasil tersedia</span>
                                         <?php endif; ?>
-                                        <button type="button" title="Detail" data-detail="<?= esc(json_encode($j), 'attr') ?>"
-                                            onclick="lihatJadwal(JSON.parse(this.dataset.detail))"
-                                            class="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-100 flex items-center justify-center">
-                                            <i class="fa-solid fa-eye text-[11px]"></i>
-                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -220,6 +219,8 @@ $badgeJuara = [1 => 'bg-amber-100 text-amber-700', 2 => 'bg-slate-200 text-slate
                     </tbody>
                 </table>
             </div>
+
+            <?= view('admin/componen_be/pagination', ['pager' => $pager, 'grup' => 'jadwal', 'perHalaman' => $perHalaman, 'url' => site_url('monev'), 'tahan' => ['kompetisi' => $filterKompetisi], 'satuan' => 'jadwal', 'jangkar' => '#jadwal']) ?>
         <?php endif; ?>
     </div>
 </section>
@@ -294,56 +295,6 @@ $badgeJuara = [1 => 'bg-amber-100 text-amber-700', 2 => 'bg-slate-200 text-slate
     </form>
 </div>
 
-<!-- Modal detail jadwal -->
-<div id="modalDetailJadwal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl max-h-[90vh] flex flex-col text-xs">
-        <div class="flex justify-between items-start gap-4 border-b p-5">
-            <div>
-                <span id="dj_status" class="text-[10px] font-bold px-2.5 py-1 rounded-full"></span>
-                <h3 id="dj_karya" class="font-bold text-slate-800 text-base mt-2"></h3>
-                <p id="dj_sub" class="text-slate-400 mt-0.5"></p>
-            </div>
-            <button type="button" onclick="closeModal('modalDetailJadwal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-        </div>
-        <div class="overflow-y-auto p-5 space-y-4">
-            <div class="grid grid-cols-2 gap-3">
-                <div class="bg-slate-50 rounded-xl p-3">
-                    <div class="text-[10px] text-slate-400 uppercase font-bold">Tanggal Monitoring</div>
-                    <div id="dj_tanggal" class="font-semibold text-slate-800 mt-0.5"></div>
-                </div>
-                <div class="bg-slate-50 rounded-xl p-3">
-                    <div class="text-[10px] text-slate-400 uppercase font-bold">Fokus</div>
-                    <div id="dj_fokus" class="font-semibold text-slate-800 mt-0.5"></div>
-                </div>
-            </div>
-            <div>
-                <div class="text-[10px] text-slate-500 uppercase font-bold mb-1">Instruksi / Tujuan</div>
-                <div id="dj_instruksi" class="bg-slate-50 border rounded-xl p-3.5 text-slate-700 whitespace-pre-line leading-relaxed"></div>
-            </div>
-            <div id="dj_hasil" class="space-y-3">
-                <div>
-                    <div class="text-[10px] text-slate-500 uppercase font-bold mb-1">Hasil Temuan</div>
-                    <div id="dj_temuan" class="bg-slate-50 border rounded-xl p-3.5 text-slate-700 whitespace-pre-line leading-relaxed"></div>
-                </div>
-                <div>
-                    <div class="text-[10px] text-emerald-700 uppercase font-bold mb-1">Rekomendasi</div>
-                    <div id="dj_rekomendasi" class="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-slate-700 whitespace-pre-line leading-relaxed"></div>
-                </div>
-                <a id="dj_file" target="_blank" class="hidden inline-flex items-center border border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-semibold px-3 py-1.5 rounded-lg">
-                    <i class="fa-solid fa-file-lines mr-1.5"></i>Lihat File Laporan
-                </a>
-                <p id="dj_tglhasil" class="text-[11px] text-slate-400"></p>
-            </div>
-            <div id="dj_belum" class="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-3.5">
-                <i class="fa-regular fa-clock mr-1"></i> Hasil monitoring belum diisi oleh pengawas lapangan.
-            </div>
-        </div>
-        <div class="flex justify-end border-t p-4 bg-slate-50 rounded-b-2xl">
-            <button type="button" onclick="closeModal('modalDetailJadwal')" class="px-4 py-2 border rounded-lg font-semibold text-slate-600 bg-white">Tutup</button>
-        </div>
-    </div>
-</div>
-
 <!-- Modal hapus -->
 <div id="modalHapusJadwal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
@@ -367,35 +318,17 @@ $badgeJuara = [1 => 'bg-amber-100 text-amber-700', 2 => 'bg-slate-200 text-slate
             type: 'bar',
             data: {
                 labels: Object.keys(data).map(k => k.replace('Kab. ', '')),
-                datasets: [{
-                        label: 'Praktik Baik',
-                        data: Object.values(data).map(v => v.praktik),
-                        backgroundColor: '#10b981'
-                    },
-                    {
-                        label: 'Bank Inovasi',
-                        data: Object.values(data).map(v => v.inovasi),
-                        backgroundColor: '#6366f1'
-                    },
+                datasets: [
+                    { label: 'Praktik Baik', data: Object.values(data).map(v => v.praktik), backgroundColor: '#10b981' },
+                    { label: 'Bank Inovasi', data: Object.values(data).map(v => v.inovasi), backgroundColor: '#6366f1' },
                 ],
             },
             options: {
                 indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        beginAtZero: true,
-                        ticks: {
-                            precision: 0
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        position: 'bottom'
-                    }
-                },
+                scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+                plugins: { legend: { position: 'bottom' } },
             },
         });
     });
@@ -447,9 +380,7 @@ $badgeJuara = [1 => 'bg-amber-100 text-amber-700', 2 => 'bg-slate-200 text-slate
     }
 
     function pilihJuara() {
-        document.querySelectorAll('.cek-peserta').forEach(c => {
-            if (c.dataset.juara) c.checked = true;
-        });
+        document.querySelectorAll('.cek-peserta').forEach(c => { if (c.dataset.juara) c.checked = true; });
         hitungDipilih();
     }
 
@@ -471,48 +402,15 @@ $badgeJuara = [1 => 'bg-amber-100 text-amber-700', 2 => 'bg-slate-200 text-slate
         document.getElementById('j_blokEdit').classList.toggle('hidden', !edit);
 
         if (edit) {
-            document.getElementById('j_infoKarya').textContent = d.judul_karya ?
-                d.judul_karya + ' — ' + (d.nama_sekolah || '-') :
-                'Karya yang sedang diedit';
+            document.getElementById('j_infoKarya').textContent = d.judul_karya
+                ? d.judul_karya + ' — ' + (d.nama_sekolah || '-')
+                : 'Karya yang sedang diedit';
             document.getElementById('j_daftarPeserta').innerHTML = '';
             document.getElementById('j_jumlah').textContent = '';
         } else {
             tampilPeserta();
         }
         openModal('modalJadwal');
-    }
-
-    function lihatJadwal(d) {
-        const isi = (id, teks) => document.getElementById(id).textContent = teks || '-';
-        const tanggal = t => t ? new Date(t.replace(' ', 'T')).toLocaleDateString('id-ID', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-        }) : '-';
-        const selesai = d.status === 'selesai';
-
-        const badge = document.getElementById('dj_status');
-        badge.className = 'text-[10px] font-bold px-2.5 py-1 rounded-full ' + (selesai ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-700');
-        badge.textContent = selesai ? 'Selesai' : 'Dijadwalkan';
-
-        isi('dj_karya', d.judul_karya + (d.peringkat ? ' (Juara ' + d.peringkat + ')' : ''));
-        isi('dj_sub', [d.nama_sekolah, d.nama_guru, d.nama_kompetisi].filter(Boolean).join(' • '));
-        isi('dj_tanggal', tanggal(d.tanggal_monev));
-        isi('dj_fokus', d.aspek_monev);
-        isi('dj_instruksi', d.deskripsi);
-
-        document.getElementById('dj_hasil').classList.toggle('hidden', !selesai);
-        document.getElementById('dj_belum').classList.toggle('hidden', selesai);
-        if (selesai) {
-            isi('dj_temuan', d.hasil_temuan);
-            isi('dj_rekomendasi', d.rekomendasi);
-            isi('dj_tglhasil', 'Hasil diisi pada ' + tanggal(d.tanggal_hasil));
-            const file = document.getElementById('dj_file');
-            file.classList.toggle('hidden', !d.file_hasil);
-            if (d.file_hasil) file.href = '<?= base_url() ?>' + d.file_hasil;
-        }
-
-        openModal('modalDetailJadwal');
     }
 
     function hapusJadwal(url) {
@@ -522,11 +420,11 @@ $badgeJuara = [1 => 'bg-amber-100 text-amber-700', 2 => 'bg-slate-200 text-slate
 
     <?php if ($errors) : ?>
         document.addEventListener('DOMContentLoaded', () => bukaFormJadwal(<?= json_encode([
-                                                                                'id_monev'      => old('id_monev'),
-                                                                                'tanggal_monev' => old('tanggal_monev'),
-                                                                                'aspek_monev'   => old('aspek_monev'),
-                                                                                'deskripsi'     => old('deskripsi'),
-                                                                            ]) ?>));
+            'id_monev'      => old('id_monev'),
+            'tanggal_monev' => old('tanggal_monev'),
+            'aspek_monev'   => old('aspek_monev'),
+            'deskripsi'     => old('deskripsi'),
+        ]) ?>));
     <?php endif; ?>
 </script>
 <?= $this->endSection() ?>

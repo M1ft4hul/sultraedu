@@ -1,9 +1,10 @@
 <?php
-
 /** @var array $praktik */
 /** @var string $status */
 /** @var array $jumlah */
 /** @var array $label */
+/** @var \CodeIgniter\Pager\Pager $pager */
+/** @var int $perHalaman */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
@@ -46,7 +47,7 @@ $tabs = ['' => 'Semua'] + $label;
         <!-- Tab status -->
         <div class="flex flex-wrap gap-2 border-b pb-3 text-xs font-semibold">
             <?php foreach ($tabs as $kunci => $teks) : ?>
-                <a href="<?= site_url('praktik-baik') . ($kunci !== '' ? '?status=' . $kunci : '') ?>"
+                <a href="<?= site_url('praktik-baik') . '?' . http_build_query(array_filter(['status' => $kunci, 'per' => $perHalaman !== 10 ? $perHalaman : ''])) ?>"
                     class="px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition
                            <?= $status === $kunci ? 'bg-brand-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' ?>">
                     <?= esc($teks) ?>
@@ -116,6 +117,8 @@ $tabs = ['' => 'Semua'] + $label;
                     </tbody>
                 </table>
             </div>
+
+            <?= view('admin/componen_be/pagination', ['pager' => $pager, 'grup' => 'praktik', 'perHalaman' => $perHalaman, 'url' => site_url('praktik-baik'), 'tahan' => ['status' => $status], 'satuan' => 'praktik baik']) ?>
         <?php endif; ?>
     </div>
 </section>
@@ -244,11 +247,7 @@ $tabs = ['' => 'Semua'] + $label;
     function formatTanggal(t) {
         if (!t) return '-';
         const d = new Date(t.replace(' ', 'T'));
-        return d.toLocaleDateString('id-ID', {
-            day: '2-digit',
-            month: 'long',
-            year: 'numeric'
-        });
+        return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
     }
 
     // Isi teks dengan aman (tidak dieksekusi sebagai HTML)
@@ -283,18 +282,10 @@ $tabs = ['' => 'Semua'] + $label;
         if (!d.lampiran || d.lampiran.length === 0) {
             wadah.innerHTML = '<p class="text-slate-400 italic">Tidak ada lampiran.</p>';
         } else {
-            const ikon = {
-                foto: 'fa-image',
-                video: 'fa-video',
-                tautan_publikasi: 'fa-link',
-                penghargaan: 'fa-award'
-            };
+            const ikon = { foto: 'fa-image', video: 'fa-video', tautan_publikasi: 'fa-link', penghargaan: 'fa-award' };
             d.lampiran.forEach(f => {
                 const a = document.createElement(f.url ? 'a' : 'div');
-                if (f.url) {
-                    a.href = f.url;
-                    a.target = '_blank';
-                }
+                if (f.url) { a.href = f.url; a.target = '_blank'; }
                 a.className = 'flex items-center gap-3 border rounded-lg p-2.5 hover:bg-slate-50';
 
                 const i = document.createElement('i');
