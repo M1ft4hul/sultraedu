@@ -1,10 +1,11 @@
 <?php
-
 /** @var array $pengguna */
 /** @var array $filter */
 /** @var array $daftarSekolah */
 /** @var array $ringkas */
 /** @var array $sekolahTanpaAdmin */
+/** @var \CodeIgniter\Pager\Pager $pager */
+/** @var int $perHalaman */
 ?>
 <?= $this->extend('admin/componen_be/layout') ?>
 
@@ -107,14 +108,14 @@
             </div>
             <!-- Teks yang disalin ke clipboard -->
             <textarea id="teksAkun" class="hidden"><?= esc(
-                                                        "Akun EDUVATION - Admin Sekolah\n" .
-                                                            "Nama     : {$akunBaru['nama']}\n" .
-                                                            "Sekolah  : {$akunBaru['sekolah']}\n" .
-                                                            "Username : {$akunBaru['username']}\n" .
-                                                            "Password : {$akunBaru['password']}\n" .
-                                                            "Login di : {$akunBaru['url']}\n\n" .
-                                                            "Mohon jaga kerahasiaan password ini."
-                                                    ) ?></textarea>
+                "Akun EDUVATION - Admin Sekolah\n" .
+                "Nama     : {$akunBaru['nama']}\n" .
+                "Sekolah  : {$akunBaru['sekolah']}\n" .
+                "Username : {$akunBaru['username']}\n" .
+                "Password : {$akunBaru['password']}\n" .
+                "Login di : {$akunBaru['url']}\n\n" .
+                "Mohon jaga kerahasiaan password ini."
+            ) ?></textarea>
         </div>
     <?php endif; ?>
 
@@ -122,6 +123,7 @@
 
         <!-- Pencarian & filter -->
         <form method="get" action="<?= site_url('pengguna') ?>" class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+            <input type="hidden" name="per" value="<?= $perHalaman ?>">
             <input type="text" name="q" value="<?= esc($filter['q']) ?>" placeholder="Cari nama, username, atau sekolah..."
                 class="md:col-span-2 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
             <select name="sekolah" class="border border-slate-300 rounded-lg p-2.5">
@@ -182,7 +184,7 @@
                     <thead class="bg-slate-100 uppercase text-slate-700 font-bold tracking-wider">
                         <tr>
                             <th class="p-3.5 rounded-l-lg w-8">
-                                <input type="checkbox" title="Pilih semua" onchange="pilihSemua(this, 'cek-akun'); hitungTerpilih()" class="w-4 h-4 accent-brand-600">
+                                <input type="checkbox" title="Pilih semua di halaman ini" onchange="pilihSemua(this, 'cek-akun'); hitungTerpilih()" class="w-4 h-4 accent-brand-600">
                             </th>
                             <th class="p-3.5">Nama</th>
                             <th class="p-3.5">Sekolah</th>
@@ -257,6 +259,67 @@
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Pagination -->
+            <?php
+            $grup    = 'pengguna';
+            $halaman = $pager->getCurrentPage($grup);
+            $jmlHal  = $pager->getPageCount($grup);
+            $total   = $pager->getTotal($grup);
+            $dari    = ($halaman - 1) * $perHalaman + 1;
+            $sampai  = min($halaman * $perHalaman, $total);
+
+            // Halaman pertama, terakhir, dan 2 di sekitar halaman aktif
+            $nomor = [];
+            for ($n = 1; $n <= $jmlHal; $n++) {
+                if ($n === 1 || $n === $jmlHal || abs($n - $halaman) <= 2) {
+                    $nomor[] = $n;
+                }
+            }
+            $kelasTombol = 'min-w-[34px] h-[34px] px-2 rounded-lg border flex items-center justify-center font-semibold transition';
+            ?>
+            <div class="flex flex-wrap justify-between items-center gap-3 pt-2 text-xs">
+                <div class="flex items-center gap-3 text-slate-500">
+                    <span>Menampilkan <b class="text-slate-700"><?= number_format($dari, 0, ',', '.') ?>–<?= number_format($sampai, 0, ',', '.') ?></b> dari <b class="text-slate-700"><?= number_format($total, 0, ',', '.') ?></b> akun</span>
+                    <form method="get" action="<?= site_url('pengguna') ?>" class="flex items-center gap-1.5">
+                        <?php foreach ($filter as $kunci => $nilai) : ?>
+                            <?php if ($nilai !== '') : ?><input type="hidden" name="<?= $kunci ?>" value="<?= esc($nilai) ?>"><?php endif; ?>
+                        <?php endforeach; ?>
+                        <select name="per" onchange="this.form.submit()" class="border border-slate-300 rounded-lg p-1.5">
+                            <?php foreach ([10, 25, 50] as $opsi) : ?>
+                                <option value="<?= $opsi ?>" <?= $perHalaman === $opsi ? 'selected' : '' ?>><?= $opsi ?> / halaman</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </form>
+                </div>
+
+                <?php if ($jmlHal > 1) : ?>
+                    <nav class="flex items-center gap-1" aria-label="Halaman">
+                        <?php if ($halaman > 1) : ?>
+                            <a href="<?= $pager->getPageURI($halaman - 1, $grup) ?>" class="<?= $kelasTombol ?> border-slate-200 text-slate-600 hover:bg-slate-50" title="Sebelumnya"><i class="fa-solid fa-chevron-left text-[10px]"></i></a>
+                        <?php else : ?>
+                            <span class="<?= $kelasTombol ?> border-slate-100 text-slate-300"><i class="fa-solid fa-chevron-left text-[10px]"></i></span>
+                        <?php endif; ?>
+
+                        <?php $sebelumnya = 0; ?>
+                        <?php foreach ($nomor as $n) : ?>
+                            <?php if ($n - $sebelumnya > 1) : ?><span class="px-1 text-slate-400">…</span><?php endif; ?>
+                            <?php if ($n === $halaman) : ?>
+                                <span class="<?= $kelasTombol ?> bg-brand-600 border-brand-600 text-white" aria-current="page"><?= $n ?></span>
+                            <?php else : ?>
+                                <a href="<?= $pager->getPageURI($n, $grup) ?>" class="<?= $kelasTombol ?> border-slate-200 text-slate-600 hover:bg-slate-50"><?= $n ?></a>
+                            <?php endif; ?>
+                            <?php $sebelumnya = $n; ?>
+                        <?php endforeach; ?>
+
+                        <?php if ($halaman < $jmlHal) : ?>
+                            <a href="<?= $pager->getPageURI($halaman + 1, $grup) ?>" class="<?= $kelasTombol ?> border-slate-200 text-slate-600 hover:bg-slate-50" title="Berikutnya"><i class="fa-solid fa-chevron-right text-[10px]"></i></a>
+                        <?php else : ?>
+                            <span class="<?= $kelasTombol ?> border-slate-100 text-slate-300"><i class="fa-solid fa-chevron-right text-[10px]"></i></span>
+                        <?php endif; ?>
+                    </nav>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
     </div>
@@ -479,9 +542,9 @@
         document.getElementById('judulFormPengguna').innerText = edit ? 'Edit Admin Sekolah' : 'Tambah Admin Sekolah';
         pass.required = !edit;
         document.getElementById('p_password_wajib').classList.toggle('hidden', !!edit);
-        document.getElementById('p_password_info').innerText = edit ?
-            'Kosongkan jika password tidak diubah. Isi untuk mereset password (min. 8 karakter).' :
-            'Minimal 8 karakter.';
+        document.getElementById('p_password_info').innerText = edit
+            ? 'Kosongkan jika password tidak diubah. Isi untuk mereset password (min. 8 karakter).'
+            : 'Minimal 8 karakter.';
 
         openModal('modalPengguna');
     }
@@ -548,9 +611,7 @@
             const res = await fetch(form.action, {
                 method: 'POST',
                 body: new FormData(form),
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
             });
 
             if (!res.ok) {
@@ -605,9 +666,9 @@
         document.getElementById('konfirmasiPesan').innerText = nama;
 
         const gaya = {
-            red: ['bg-red-100 text-red-600', 'bg-red-600 hover:bg-red-700'],
+            red:   ['bg-red-100 text-red-600',     'bg-red-600 hover:bg-red-700'],
             amber: ['bg-amber-100 text-amber-600', 'bg-amber-500 hover:bg-amber-600'],
-        } [warna];
+        }[warna];
 
         document.getElementById('konfirmasiIkon').className = 'mx-auto w-14 h-14 rounded-full flex items-center justify-center ' + gaya[0];
         document.getElementById('konfirmasiTombol').className = 'px-4 py-2 text-white rounded-lg text-xs font-semibold ' + gaya[1];
@@ -619,13 +680,13 @@
     <?php if ($errors) : ?>
         document.addEventListener('DOMContentLoaded', function() {
             bukaFormPengguna(<?= json_encode([
-                                    'id_admin'   => old('id_admin'),
-                                    'id_sekolah' => old('id_sekolah'),
-                                    'nama_admin' => old('nama_admin'),
-                                    'username'   => old('username'),
-                                    'email'      => old('email'),
-                                    'status'     => old('status'),
-                                ]) ?>);
+                'id_admin'   => old('id_admin'),
+                'id_sekolah' => old('id_sekolah'),
+                'nama_admin' => old('nama_admin'),
+                'username'   => old('username'),
+                'email'      => old('email'),
+                'status'     => old('status'),
+            ]) ?>);
         });
     <?php endif; ?>
 </script>

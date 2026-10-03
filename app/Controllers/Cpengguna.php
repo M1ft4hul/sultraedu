@@ -39,7 +39,8 @@ class Cpengguna extends BaseController
     }
 
     // Query daftar akun admin sekolah (dipakai di tabel dan export)
-    private function queryPengguna(array $filter): array
+    // $perHalaman diisi = pakai pagination (halaman daftar); null = semua data (unduh Excel)
+    private function queryPengguna(array $filter, ?int $perHalaman = null): array
     {
         // Kolom dipilih satu per satu supaya hash password tidak ikut terambil
         $builder = $this->admin
@@ -61,7 +62,9 @@ class Cpengguna extends BaseController
             $builder->where('admin.status', $filter['status']);
         }
 
-        return $builder->orderBy('s.nama_sekolah', 'ASC')->findAll();
+        $builder->orderBy('s.nama_sekolah', 'ASC')->orderBy('admin.nama_admin', 'ASC');
+
+        return $perHalaman ? $builder->paginate($perHalaman, 'pengguna') : $builder->findAll();
     }
 
     // Sekolah aktif yang belum punya akun admin sekolah
@@ -153,8 +156,16 @@ class Cpengguna extends BaseController
 
         $filter = $this->ambilFilter();
 
-        $data['pengguna'] = $this->queryPengguna($filter);
-        $data['filter']   = $filter;
+        // Pagination: 10 data per halaman (bisa 25 / 50)
+        $perHalaman = (int) $this->request->getGet('per');
+        if (! in_array($perHalaman, [10, 25, 50], true)) {
+            $perHalaman = 10;
+        }
+
+        $data['pengguna']   = $this->queryPengguna($filter, $perHalaman);
+        $data['pager']      = $this->admin->pager;
+        $data['perHalaman'] = $perHalaman;
+        $data['filter']     = $filter;
 
         // Daftar sekolah untuk dropdown form & filter
         $data['daftarSekolah'] = (new SekolahModel())
@@ -185,15 +196,9 @@ class Cpengguna extends BaseController
         }
 
         $input = $this->request->getPost([
-            'id_admin',
-            'nama_admin',
-            'username',
-            'password',
-            'id_sekolah',
-            'email',
-            'status',
+            'id_admin', 'nama_admin', 'username', 'password', 'id_sekolah', 'email', 'status',
         ]);
-        $input = array_map(fn($v) => is_string($v) ? trim($v) : $v, $input);
+        $input = array_map(fn ($v) => is_string($v) ? trim($v) : $v, $input);
         $input['username'] = strtolower($input['username'] ?? '');
 
         $edit = ! empty($input['id_admin']);
@@ -338,7 +343,7 @@ class Cpengguna extends BaseController
         // Hanya sekolah yang memang belum punya admin (mencegah akun dobel)
         $sekolah = array_filter(
             $this->sekolahTanpaAdmin(),
-            fn($s) => in_array((int) $s['id_sekolah'], $dipilih, true)
+            fn ($s) => in_array((int) $s['id_sekolah'], $dipilih, true)
         );
         if (empty($sekolah)) {
             return $this->gagalMassal('Sekolah yang dipilih sudah memiliki akun admin.');
